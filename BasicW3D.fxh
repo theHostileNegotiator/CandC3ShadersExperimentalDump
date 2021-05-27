@@ -976,7 +976,7 @@ technique _Default_L
 		USE_EXPRESSION_EVALUATOR("BasicW3D_M")
 	>
 	{
-		VertexShader = ARRAY_EXPRESSION_VS(VS_L_Array,
+		VertexShader = ARRAY_EXPRESSION_DIRECT_VS(VS_L_Array,
 			min(NumJointsPerVertex, 2) * VS_M_Multiplier_NumJointsPerVertex,
 			NO_ARRAY_ALTERNATIVE
 		);
