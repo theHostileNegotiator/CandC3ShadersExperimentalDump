@@ -65,6 +65,11 @@ SAMPLER_2D_BEGIN( Texture_0,
 //	AddressV = Clamp;
 SAMPLER_2D_END
 
+bool MultiTextureEnable
+<
+	string UIName = "Multi Texture Enable";
+> = true;
+
 float TexCoordTransformAngle_0 // Note all rotation matricies ues this number
 <
 	string UIName = "Radian Delta Rate per Frame";
@@ -155,6 +160,7 @@ static const int FogMode_Disabled = 0;
 static const int FogMode_Opaque = 1;
 static const int FogMode_Additive = 2;
 static const int FogMode_Multiplicative = 3;
+static const int FogMode_MultiplicativeAlpha = 4;
 
 // Transformations
 float4x4 View : View;
@@ -262,14 +268,14 @@ float4 PS(VSOutput In, uniform int fogMode) : COLOR0
 	float4 color = float4 (In.DiffuseColor, 1.0);
 	color *= tex2D(SAMPLER(Texture_0), In.TexCoord0);
 	color *= tex2D(SAMPLER(Texture_0), In.TexCoord1);
-	color *= 2;
+	color *= 1;
 
 	if (fogMode == FogMode_Additive)
 	{
 	 	// Fog used with additive blending just needs to reduce the additive influence
 		color.xyz *= In.Fog;
 	}
-	else if (fogMode == FogMode_Multiplicative)
+	else if (fogMode == FogMode_Multiplicative || fogMode == FogMode_MultiplicativeAlpha)
 	{
 	 	// Fog used with multiply blending just needs to blend towards 1
 		color.xyz = 1 - (1 - color.xyz) * In.Fog;
@@ -277,7 +283,15 @@ float4 PS(VSOutput In, uniform int fogMode) : COLOR0
 
 	// Apply shroud
 #if defined(_WW3D_) && !defined(_W3DVIEW_)
-	color.xyz *= tex2D( SAMPLER(ShroudTexture), In.ShroudTexCoord);
+	if (fogMode == FogMode_MultiplicativeAlpha)
+	{
+		// Alpha Blend
+		color.xyz *= color.w * (tex2D( SAMPLER(ShroudTexture), In.ShroudTexCoord) - 1) + 1;
+	}
+	else
+	{
+		color.xyz *= tex2D( SAMPLER(ShroudTexture), In.ShroudTexCoord);
+	}
 #endif
 
 	return color;
@@ -354,6 +368,32 @@ technique Multiply_M
 	}  
 }
 
+// ----------------------------------------------------------------------------
+technique MultiplyAlpha_M
+<
+	int MaxSkinningBones = MaxSkinningBones_L;
+>
+{
+	pass P0
+	{
+		VertexShader = ARRAY_EXPRESSION_DIRECT_VS(VS_Array,
+			min(NumJointsPerVertex, 2),
+			compile VS_VERSION VS_Xenon()
+		);
+		PixelShader = compile PS_VERSION_HIGH PS(FogMode_MultiplicativeAlpha);
+
+
+		ZEnable = true;
+		ZFunc = ZFUNC_INFRONT;
+		ZWriteEnable = false;
+		CullMode = none;
+		AlphaBlendEnable = true;
+		SrcBlend = DestColor;
+		DestBlend = Zero;
+		AlphaTestEnable = false;
+	}  
+}
+
 #if ENABLE_LOD
 
 // ----------------------------------------------------------------------------
@@ -386,6 +426,32 @@ technique _Additive_L
 
 // ----------------------------------------------------------------------------
 technique _Multiply_L
+<
+	int MaxSkinningBones = MaxSkinningBones_L;
+>
+{
+	pass P0
+	{
+		VertexShader = ARRAY_EXPRESSION_DIRECT_VS(VS_Array,
+			min(NumJointsPerVertex, 2),
+			compile VS_VERSION VS_Xenon()
+		);
+		PixelShader = compile PS_VERSION_LOW PS(FogMode_Disabled);
+
+
+		ZEnable = true;
+		ZFunc = ZFUNC_INFRONT;
+		ZWriteEnable = false;
+		CullMode = none;
+		AlphaBlendEnable = true;
+		SrcBlend = DestColor;
+		DestBlend = Zero;
+		AlphaTestEnable = false;
+	}  
+}
+
+// ----------------------------------------------------------------------------
+technique _MultiplyAlpha_L
 <
 	int MaxSkinningBones = MaxSkinningBones_L;
 >
