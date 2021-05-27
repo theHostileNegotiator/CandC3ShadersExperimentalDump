@@ -39,6 +39,27 @@ SAMPLER_2D_BEGIN( MaskSampler,
 	MipFilter = Linear;
 SAMPLER_2D_END
 
+SAMPLER_2D_BEGIN( MetaGlowSampler,
+	string UIWidget = "None";
+	string SasBindAddress = "Decal.BaseTexture";
+	)
+	AddressU = Wrap;
+	AddressV = Wrap;
+	MinFilter = Point;
+	MagFilter = Point;
+	MipFilter = Point;
+SAMPLER_2D_END
+
+SAMPLER_2D_BEGIN( MetaMaskSampler,
+	string UIWidget = "None";
+	string SasBindAddress = "Decal.MaskTexture";
+	)
+	AddressU = Clamp;
+	AddressV = Clamp;
+	MinFilter = Point;
+	MagFilter = Point;
+	MipFilter = Point;
+SAMPLER_2D_END
 
 // ----------------------------------------------------------------------------
 // FOG
@@ -84,6 +105,8 @@ float4x4 WorldViewProjection : WorldViewProjection;
 float4x3 World : World;
 float4x3 ViewI : ViewInverse;
 float Time : Time;
+float4 MaxColorDelta = float4(1, 1, 1, 0);
+float4 HalfColorDelta = float4(-0.33, -0.33, -0.33, 0);
 
 // ----------------------------------------------------------------------------
 struct VSOutput
@@ -199,12 +222,95 @@ float4 TiberiumPS(VSOutput_Tiberium In) : COLOR
 	// Get vertex color
 	float4 color = In.DiffuseColor;		// Get my color
 	// Multiply by the main color
-	color.xyzw *= tex2D( SAMPLER(MaskSampler), In.MaskTexCoord);
+	color.xyzw *= tex2D( SAMPLER(MetaMaskSampler), In.MaskTexCoord);
 	color.w *= 2;		// Double the alpha
-	color.xyz += tex2D( SAMPLER(GlowSampler), In.GlowTexCoord);
+	color.xyz += tex2D( SAMPLER(MetaGlowSampler), In.GlowTexCoord);
 	color.xyz = lerp(Fog.Color, color.xyz, In.Fog);
 	return color;
 }
+// ----------------------------------------------------------------------------
+// TiberiumMetagame shader
+// ----------------------------------------------------------------------------
+struct VSOutput_TiberiumMetagame
+{
+	float4 Position : POSITION;
+	float4 DiffuseColor : COLOR0;
+	float  Fog : COLOR1;
+	float2 MaskTexCoord : TEXCOORD0;
+	float2 GlowTexCoord0 : TEXCOORD1;
+	float2 GlowTexCoord1 : TEXCOORD2;
+};
+
+// ----------------------------------------------------------------------------
+VSOutput_TiberiumMetagame TiberiumMetagameVS(float3 Position : POSITION, float2 TexCoord0 : TEXCOORD0, float4 VertexColor : COLOR0)
+{
+	VSOutput_TiberiumMetagame Out;
+	
+	Out.Position = mul(float4(Position, 1), WorldViewProjection);
+
+	float3 worldPosition = mul(float4(Position, 1), World);
+	float3 worldNormal = float3(0, 0, 1); // Close enough
+
+	// Material parameters. Values equivalent to DefaultW3D.fx setup in 3DSMax
+	float3 ColorAmbient = float3(1.0, 1.0, 1.0);
+
+//	float3 ColorDiffuse = float3(0.0, 0.3, 0.04);
+	float3 ColorDiffuse = float3(1.0, 1.0, 1.0);
+	float3 ColorSpecular = float3(0.45, 1.0, 0.70) * 0.75;
+	float Shininess = 25.0;
+	float3 ColorEmissive = float3(0.0, 0.0, 0.0);
+	
+	// Compute view direction in world space
+	float3 worldEyeDir = normalize(ViewI[3] - worldPosition);
+	
+	// Compute light
+	float3 diffuseLight = 0;
+	float3 specularLight = 0;
+	
+	// Compute directional lights
+	for (int i = 0; i < NumDirectionalLights; i++)
+	{
+		float3 halfEyeLightVector = normalize(DirectionalLight[i].Direction + worldEyeDir);
+
+		float4 lighting = lit(dot(worldNormal, DirectionalLight[i].Direction),
+			dot(worldNormal, halfEyeLightVector), Shininess);
+
+		float3 lightColor = DirectionalLight[i].Color;
+		if (i == 0)
+		{
+			lightColor *= NoCloudMultiplier;
+		}
+
+		diffuseLight += lightColor * lighting.y;
+		specularLight += lightColor * lighting.z;
+	}
+	
+	float3 color = ColorEmissive + AmbientLightColor * ColorAmbient
+		+ diffuseLight * ColorDiffuse + specularLight * ColorSpecular;
+
+	Out.DiffuseColor = float4(color, 1) * VertexColor;	
+	Out.MaskTexCoord = TexCoord0;
+	float3 CP = ViewI[3];
+	Out.Fog = CalculateFog(Fog, worldPosition, CP);
+
+	// The glow texture needs to be sampled with polar coordinates, u = angle, v = radius
+	float2 relativeTexCoord = TexCoord0 + float2(0.03, 0.03);
+
+	Out.GlowTexCoord0 = length(relativeTexCoord) + Time * 0.004;
+	Out.GlowTexCoord1 = length(relativeTexCoord) - Time * 0.004;
+	
+	return Out;
+}
+
+// ----------------------------------------------------------------------------
+float4 TiberiumMetagamePS(VSOutput_TiberiumMetagame In) : COLOR
+{
+	float4 color = tex2D( SAMPLER(GlowSampler), In.GlowTexCoord0) * tex2D( SAMPLER(GlowSampler), In.GlowTexCoord1);
+	color.xyzw = dot(float4(1, 0, 0, 1), color.xyzw) * MaxColorDelta + HalfColorDelta;
+	color.xyzw = saturate(tex2D( SAMPLER(MaskSampler), In.MaskTexCoord) * In.DiffuseColor + color.xyzw);
+	return color;
+}
+
 // ----------------------------------------------------------------------------
 technique Alpha
 {
@@ -355,6 +461,24 @@ technique TiberiumRoot
 	{
 		VertexShader = compile VS_VERSION_LOW TiberiumVS();
 		PixelShader = compile PS_VERSION_LOW TiberiumPS();
+
+		ZEnable = true;
+		ZFunc = ZFUNC_INFRONT;
+		ZWriteEnable = false;
+		CullMode = None;
+		AlphaBlendEnable = true;
+		SrcBlend = SrcAlpha;
+		DestBlend = InvSrcAlpha;
+		AlphaTestEnable = false;
+	}  
+}
+
+technique TiberiumRootMetagame
+{
+	pass P0
+	{
+		VertexShader = compile VS_VERSION_LOW TiberiumMetagameVS();
+		PixelShader = compile PS_VERSION_LOW TiberiumMetagamePS();
 
 		ZEnable = true;
 		ZFunc = ZFUNC_INFRONT;
