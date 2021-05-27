@@ -799,12 +799,12 @@ float4 PS(VSOutput In, uniform int numShadows, uniform bool applyShroud,
 #if defined(SUPPORT_RECOLORING)
 	if (recolorEnabled)
 	{
-		float4 recolorColor = tex2D( SAMPLER(RecolorTexture), texCoord0);
-		recolorColor.xyz *= RecolorColor;
+		// float4 recolorColor = tex2D( SAMPLER(RecolorTexture), texCoord0);
+		// recolorColor.xyz *= RecolorColor;
 #if defined(OBJECTS_ALIEN)
-		color.xyz += recolorColor.xyz * alienPulse;
+		color.xyz += selfIlluminationStrength * RecolorColor * alienPulse;
 #else
-		color.xyz = lerp(color.xyz, recolorColor.xyz, recolorColor.a);
+		color.xyz = lerp(color.xyz, RecolorColor, selfIlluminationStrength);
 #endif
 	}
 #endif //defined(SUPPORT_RECOLORING)
@@ -1314,12 +1314,12 @@ float4 PS_M(VSOutput_M In, uniform bool applyShroud, uniform bool fogEnabled, un
 #if defined(SUPPORT_RECOLORING)
 	if (recolorEnabled)
 	{
-		float4 recolorColor = tex2D( SAMPLER(RecolorTexture), In.TexCoord0);
-		recolorColor.xyz *= RecolorColor;
+		// float4 recolorColor = tex2D( SAMPLER(RecolorTexture), In.TexCoord0);
+		// recolorColor.xyz *= RecolorColor;
 #if defined(OBJECTS_ALIEN)
-		color.xyz += recolorColor.xyz * In.AlienPulse;
+		color.xyz += selfIlluminationStrength * RecolorColor * In.AlienPulse;
 #else
-		color.xyz = lerp(color.xyz, recolorColor.xyz, recolorColor.a);
+		color.xyz = lerp(color.xyz, RecolorColor, selfIlluminationStrength);
 #endif
 	}
 #endif //defined(SUPPORT_RECOLORING)
@@ -1540,11 +1540,15 @@ float4 PS_L(VSOutput_L In, uniform bool applyShroud, uniform bool recolorEnabled
 #endif
 
 	color.xyz += color.xyz;
-
-
-#if defined(SCROLL_HOUSECOLOR)
+	
+#if defined(SUPPORT_SPECMAP)
 	float4 specTexture = tex2D(SAMPLER(SpecMap), In.RecolorTexCoord);
 	float selfIlluminationStrength = specTexture.z;
+#endif
+
+#if defined(SCROLL_HOUSECOLOR)
+	// float4 specTexture = tex2D(SAMPLER(SpecMap), In.RecolorTexCoord);
+	// float selfIlluminationStrength = specTexture.z;
 
 	color.xyz += selfIlluminationStrength * RecolorColor * RecolorMultiplier * recolorEnabled;
 #else // defined(SCROLL_HOUSECOLOR)
@@ -1552,12 +1556,12 @@ float4 PS_L(VSOutput_L In, uniform bool applyShroud, uniform bool recolorEnabled
 #if defined(SUPPORT_RECOLORING)
 	if (recolorEnabled)
 	{
-		float4 recolorColor = tex2D( SAMPLER(RecolorTexture), In.RecolorTexCoord);
-		recolorColor.xyz *= RecolorColor;
+		// float4 recolorColor = tex2D( SAMPLER(RecolorTexture), In.RecolorTexCoord);
+		// recolorColor.xyz *= RecolorColor;
 #if defined(OBJECTS_ALIEN)
-		color.xyz += recolorColor.xyz * In.AlienPulse * 4;
+		color.xyz += selfIlluminationStrength * RecolorColor * In.AlienPulse * 4;
 #else
-		color.xyz = lerp(color.xyz, recolorColor.xyz, recolorColor.a);
+		color.xyz = lerp(color.xyz, RecolorColor, selfIlluminationStrength);
 #endif
 	}
 #endif //defined(SUPPORT_RECOLORING)
