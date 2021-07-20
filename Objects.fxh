@@ -1561,7 +1561,7 @@ float4 PS_L(VSOutput_L In, uniform bool applyShroud, uniform bool recolorEnabled
 #if defined(OBJECTS_ALIEN)
 		color.xyz += selfIlluminationStrength * RecolorColor * In.AlienPulse * 4;
 #else
-		color.xyz = lerp(color.xyz, RecolorColor, selfIlluminationStrength);
+		color.xyz += selfIlluminationStrength * (RecolorColor - color.xyz);
 #endif
 	}
 #endif //defined(SUPPORT_RECOLORING)
