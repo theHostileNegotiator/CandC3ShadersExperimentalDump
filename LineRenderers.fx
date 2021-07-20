@@ -34,11 +34,24 @@ static const int BLEND_MODE_ADDITIVE_NO_DEPTH_TEST = 5;
 static const int BLEND_MODE_ALPHA_NO_DEPTH_TEST = 6;
 static const int NUM_BLEND_MODES = 7;
 
+
+
+SAMPLER_2D_BEGIN(MoveMarkerLineSampler,
+	string UIWidget = "None";
+	string SasBindAddress = "WW3D.MiscTexture";
+	)
+	MinFilter = Linear;
+	MagFilter = Linear;
+	MipFilter = Linear;
+	AddressU = Clamp;
+	AddressV = Wrap;
+SAMPLER_2D_END
+
 int BlendMode
 <
 	string UIName = "Blend mode";
 	int UIMin = 0;
-	int UIMax = NUM_BLEND_MODES - 1;
+	int UIMax = NUM_BLEND_MODES;
 > = BLEND_MODE_ALPHA;
 
 struct VSOutput
@@ -48,7 +61,7 @@ struct VSOutput
 	float2 BaseTexCoord : TEXCOORD0;
 };
 
-VSOutput VS(float3 Position : POSITION, float2 TexCoord0 : TEXCOORD0, float4 VertexColor : COLOR0)
+VSOutput VS(float3 Position : POSITION, float2 TexCoord0 : TEXCOORD0, float4 VertexColor : COLOR0, uniform bool movemarkerline)
 {
 	VSOutput Out;
 	
@@ -59,16 +72,28 @@ VSOutput VS(float3 Position : POSITION, float2 TexCoord0 : TEXCOORD0, float4 Ver
 	
 	Out.BaseTexCoord = TexCoord0;
 	
+	if (movemarkerline)
+	{
+		Out.BaseTexCoord.y += Time * -0.5;
+	}
+	
 	return Out;
 }
 
-float4 PS(VSOutput In) : COLOR
+float4 PS(VSOutput In, uniform bool movemarkerline) : COLOR
 {
 	// Get vertex color
 	float4 color = In.DiffuseColor;
 
 	// Apply texture
-	color *= tex2D(SAMPLER(Texture0), In.BaseTexCoord);
+	if (movemarkerline)
+	{
+		color *= tex2D(SAMPLER(MoveMarkerLineSampler), In.BaseTexCoord);
+	}
+	else
+	{
+		color *= tex2D(SAMPLER(Texture0), In.BaseTexCoord);
+	}
 
 	return color;
 }
@@ -77,8 +102,8 @@ technique Alpha
 {
 	pass P0
 	{
-		VertexShader = compile VS_VERSION_LOW VS();
-		PixelShader = compile PS_VERSION_LOW PS();
+		VertexShader = compile VS_VERSION_LOW VS(0);
+		PixelShader = compile PS_VERSION_LOW PS(0);
 
 		ZEnable = true;
 		ZFunc = ZFUNC_INFRONT;
@@ -97,8 +122,8 @@ technique Additive
 {
 	pass P0
 	{
-		VertexShader = compile VS_VERSION_LOW VS();
-		PixelShader = compile PS_VERSION_LOW PS();
+		VertexShader = compile VS_VERSION_LOW VS(0);
+		PixelShader = compile PS_VERSION_LOW PS(0);
 
 		ZEnable = true;
 		ZFunc = ZFUNC_INFRONT;
@@ -117,8 +142,8 @@ technique AdditiveAlphaTest
 {
 	pass P0
 	{
-		VertexShader = compile VS_VERSION_LOW VS();
-		PixelShader = compile PS_VERSION_LOW PS();
+		VertexShader = compile VS_VERSION_LOW VS(0);
+		PixelShader = compile PS_VERSION_LOW PS(0);
 
 		ZEnable = true;
 		ZFunc = ZFUNC_INFRONT;
@@ -139,8 +164,8 @@ technique AlphaTest
 {
 	pass P0
 	{
-		VertexShader = compile VS_VERSION_LOW VS();
-		PixelShader = compile PS_VERSION_LOW PS();
+		VertexShader = compile VS_VERSION_LOW VS(0);
+		PixelShader = compile PS_VERSION_LOW PS(0);
 		
 		ZEnable = true;
 		ZFunc = ZFUNC_INFRONT;
@@ -159,8 +184,8 @@ technique Multiplicative
 {
 	pass P0
 	{
-		VertexShader = compile VS_VERSION_LOW VS();
-		PixelShader = compile PS_VERSION_LOW PS();
+		VertexShader = compile VS_VERSION_LOW VS(0);
+		PixelShader = compile PS_VERSION_LOW PS(0);
 
 		ZEnable = true;
 		ZFunc = ZFUNC_INFRONT;
@@ -179,8 +204,8 @@ technique AdditiveNoDepthTest
 {
 	pass P0
 	{
-		VertexShader = compile VS_VERSION_LOW VS();
-		PixelShader = compile PS_VERSION_LOW PS();
+		VertexShader = compile VS_VERSION_LOW VS(0);
+		PixelShader = compile PS_VERSION_LOW PS(0);
 
 		ZEnable = false;
 		ZWriteEnable = false;
@@ -198,8 +223,8 @@ technique AlphaNoDepthTest
 {
 	pass P0
 	{
-		VertexShader = compile VS_VERSION_LOW VS();
-		PixelShader = compile PS_VERSION_LOW PS();
+		VertexShader = compile VS_VERSION_LOW VS(0);
+		PixelShader = compile PS_VERSION_LOW PS(0);
 
 		ZEnable = false;
 		ZWriteEnable = false;
@@ -208,6 +233,26 @@ technique AlphaNoDepthTest
 		AlphaBlendEnable = true;
 		SrcBlend = SrcAlpha;
 		DestBlend = InvSrcAlpha;
+		
+		AlphaTestEnable = false;
+	}  
+}
+
+technique MarkerLineDraw
+{
+	pass P0
+	{
+		VertexShader = compile VS_VERSION_LOW VS(1);
+		PixelShader = compile PS_VERSION_LOW PS(1);
+
+		ZEnable = true;
+		ZFunc = ZFUNC_INFRONT;
+		ZWriteEnable = false;
+		CullMode = None;
+		
+		AlphaBlendEnable = true;
+		SrcBlend = One;
+		DestBlend = One;
 		
 		AlphaTestEnable = false;
 	}  
