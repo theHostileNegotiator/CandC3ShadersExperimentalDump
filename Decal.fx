@@ -294,10 +294,8 @@ VSOutput_TiberiumMetagame TiberiumMetagameVS(float3 Position : POSITION, float2 
 	Out.Fog = CalculateFog(Fog, worldPosition, CP);
 
 	// The glow texture needs to be sampled with polar coordinates, u = angle, v = radius
-	float2 relativeTexCoord = TexCoord0 + float2(0.03, 0.03);
-
-	Out.GlowTexCoord0 = length(relativeTexCoord) + Time * 0.004;
-	Out.GlowTexCoord1 = length(relativeTexCoord) - Time * 0.004;
+	Out.GlowTexCoord0 = worldPosition * 0.003 + Time * 0.004;
+	Out.GlowTexCoord1 = worldPosition * 0.003 - Time * 0.004;
 	
 	return Out;
 }
@@ -306,8 +304,10 @@ VSOutput_TiberiumMetagame TiberiumMetagameVS(float3 Position : POSITION, float2 
 float4 TiberiumMetagamePS(VSOutput_TiberiumMetagame In) : COLOR
 {
 	float4 color = tex2D( SAMPLER(GlowSampler), In.GlowTexCoord0) * tex2D( SAMPLER(GlowSampler), In.GlowTexCoord1);
-	color.xyzw = dot(float4(1, 0, 0, 1), color.xyzw) * MaxColorDelta + HalfColorDelta;
-	color.xyzw = saturate(tex2D( SAMPLER(MaskSampler), In.MaskTexCoord) * In.DiffuseColor + color.xyzw);
+	color.xyzw = dot(float4(1, 0, 0, 1), color.xyzw) * MaxColorDelta;
+	color.xyzw += HalfColorDelta;
+	color.xyzw += tex2D( SAMPLER(MaskSampler), In.MaskTexCoord) * In.DiffuseColor;
+	color.xyzw = saturate(color.xyzw);
 	return color;
 }
 
