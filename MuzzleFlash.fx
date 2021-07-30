@@ -227,18 +227,21 @@ VSOutput VS(VSInputSkinningMultipleBones InSkin,
 		float2 texCoordCentered = TexCoord0 - UVPivot0;
 		texCoord0 = mul(texCoordCentered, uvCoordRotate) + UVPivot0;
 		texCoord1 = mul(texCoordCentered, transpose(uvCoordRotate)) + UVPivot0;
+		texCoord1 = texCoord0 + (-pow(MultiTextureEnable - 1, 2) >= pow(MultiTextureEnable - 1, 2)) * (texCoord1 - texCoord0);
 	}
 	else if (VertexColor.w < 1.5)
 	{
 		float2 texCoordCentered = TexCoord0 - UVPivot1;
 		texCoord0 = mul(texCoordCentered, uvCoordRotate) + UVPivot1;
 		texCoord1 = mul(texCoordCentered, transpose(uvCoordRotate)) + UVPivot1;
+		texCoord1 = texCoord0 + (-pow(MultiTextureEnable - 1, 2) >= pow(MultiTextureEnable - 1, 2)) * (texCoord1 - texCoord0);
 	}
 	else if (VertexColor.w < 2.5)
 	{
 		float2 texCoordCentered = TexCoord0 - UVPivot2;
 		texCoord0 = mul(texCoordCentered, uvCoordRotate) + UVPivot2;
 		texCoord1 = mul(texCoordCentered, transpose(uvCoordRotate)) + UVPivot2;
+		texCoord1 = texCoord0 + (-pow(MultiTextureEnable - 1, 2) >= pow(MultiTextureEnable - 1, 2)) * (texCoord1 - texCoord0);
 	}
 	
 	Out.TexCoord0 = texCoord0;
