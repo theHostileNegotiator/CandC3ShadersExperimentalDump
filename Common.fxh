@@ -416,11 +416,11 @@ float shadowSimple(sampler2D shadowSampler, float4 shadowTexCoord, ShadowSetup s
 //
 
 #define DEFAULT_DIRECTIONAL_LIGHT_1 \
-	{ float3(1.247, 1.207, 1.043), float3(0.62914, -0.34874, 0.69465) }
+	{ float3(1.625198, 1.512711, 1.097048), float3(0.62914, -0.34874, 0.69465) }
 #define DEFAULT_DIRECTIONAL_LIGHT_2 \
-	{ float3(0.745, 0.831, 0.894), float3(-0.32877, 0.90329, 0.27563) }
+	{ float3(0.5232916, 0.6654605, 0.7815244), float3(-0.32877, 0.90329, 0.27563) }
 #define DEFAULT_DIRECTIONAL_LIGHT_3 \
-	{ float3(0.690, 0.667, 0.690), float3(-0.80704, -0.58635, 0.06975) }
+	{ float3(0.4420466, 0.4102767, 0.4420466), float3(-0.80704, -0.58635, 0.06975) }
 
 #define DEFAULT_DIRECTIONAL_LIGHT_DISABLED \
 	{ float3(0, 0, 0), float3(0, 0, 1) }
