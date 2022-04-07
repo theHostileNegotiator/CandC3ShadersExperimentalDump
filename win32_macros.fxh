@@ -48,12 +48,12 @@
 // SHADER VERSIONS
 // ----------------------------------------------------------------------------
 #define VS_VERSION_ULTRAHIGH	vs_3_0
-#define VS_VERSION_HIGH			vs_2_0
-#define VS_VERSION_LOW			vs_1_1
+#define VS_VERSION_HIGH			vs_3_0
+#define VS_VERSION_LOW			vs_2_0
 
 #define PS_VERSION_ULTRAHIGH	ps_3_0
-#define PS_VERSION_HIGH			ps_2_0
-#define PS_VERSION_LOW			ps_1_1
+#define PS_VERSION_HIGH			ps_3_0
+#define PS_VERSION_LOW			ps_2_0
 
 // ----------------------------------------------------------------------------
 // FILTERS
