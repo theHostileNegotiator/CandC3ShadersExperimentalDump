@@ -46,25 +46,22 @@
 #define SAMPLER_CUBE_END };
 #endif
 
-// ----------------------------------------------------------------------------
-// Skinning
-// ----------------------------------------------------------------------------
-static const int MaxSkinningBonesPerVertex = 1;
-
-#include "Skinning.fxh"
+string DefaultParameterScopeBlock = "material";
 
 // ----------------------------------------------------------------------------
 // Light sources
 // ----------------------------------------------------------------------------
 static const int NumDirectionalLights = 3;
 static const int NumDirectionalLightsPerPixel = 2;
-static const int NumPointLights = 1;
-float3 AmbientLightColor : Ambient = float3(0.1, 0.1, 0.1);
+// static const int NumPointLights = 8;
+float3 AmbientLightColor
+<
+	bool unmanaged = 1;
+> = float3(0.3, 0.3, 0.3);
 
 SasDirectionalLight DirectionalLight[NumDirectionalLights]
 <
-	string SasBindAddress = "Sas.DirectionalLight[*]";
-	string UIWidget = "None";
+	bool unmanaged = 1;
 > =
 {
 	DEFAULT_DIRECTIONAL_LIGHT_1,
@@ -75,218 +72,36 @@ SasDirectionalLight DirectionalLight[NumDirectionalLights]
 DECLARE_DIRECTIONAL_LIGHT_INTERACTIVE(DirectionalLight, 0);
 
 #if defined(SUPPORT_POINT_LIGHTS)
-int NumPointLightsUsed
+int NumPointLights
 <
 	string SasBindAddress = "Sas.NumPointLights";
 	string UIWidget = "None";
-> = 0;
-
-SasPointLight PointLight[NumPointLights]
-<
-	string SasBindAddress = "Sas.PointLight[*]";
-	string UIWidget = "None";
-> =
-{
-	DEFAULT_POINT_LIGHT_DISABLED
-};
-#endif
-
-
-float3 TintColor
-<
-	string UIName = "Tint Color"; 
-    string UIWidget = "Color";
-> = float3(1, 1, 1);
-
-
-// ----------------------------------------------------------------------------
-// Shadow mapping
-// ----------------------------------------------------------------------------
-int NumShadows
-<
-	string UIWidget = "None";
-	string SasBindAddress = "Sas.NumShadows";
-> = 0;
-
-ShadowSetup ShadowInfo
-<
-	string UIWidget = "None";
-	string SasBindAddress = "Sas.Shadow[0]";
 >;
 
-SAMPLER_2D_SHADOW( ShadowMap )
+SasPointLight PointLight[8]
+<
+	bool unmanaged = 1;
+>;
+#endif
 
 // ----------------------------------------------------------------------------
 // Cloud layer
 // ----------------------------------------------------------------------------
 CloudSetup Cloud
 <
-	string UIWidget = "None";
-	string SasBindAddress = "Terrain.Cloud";
-> = DEFAULT_CLOUD;
-
-
-SAMPLER_2D_BEGIN( CloudTexture,
-	string UIWidget = "None";
-	string SasBindAddress = "Terrain.Cloud.Texture";
-	string ResourceName = "ShaderPreviewCloud.dds";
-	)
-	MinFilter = Linear;
-	MagFilter = Linear;
-	MipFilter = Linear;
-    AddressU = Wrap;
-    AddressV = Wrap;
-SAMPLER_2D_END
+	bool unmanaged = 1;
+>;
 
 float3 NoCloudMultiplier
 <
-	string UIWidget = "None";
-	string SasBindAddress = "Terrain.Cloud.NoCloudMultiplier";
+	bool unmanaged = 1;
 > = float3(1, 1, 1);
-
-// ----------------------------------------------------------------------------
-// Environment map
-// ----------------------------------------------------------------------------
-#if OBJECTS_ALIEN
-SAMPLER_2D_BEGIN( EnvironmentTexture,
-	string UIName = "Reflection Texture";
-	)
-	MinFilter = MinFilterBest;
-	MagFilter = MagFilterBest;
-	MipFilter = MipFilterBest;
-	MaxAnisotropy = 8;
-    AddressU = Wrap;
-    AddressV = Wrap;
-SAMPLER_2D_END
-#elif defined(SPECIFY_CUSTOM_ENVMAP)
-SAMPLER_CUBE_BEGIN( EnvironmentTexture,
-	string UIName = "Reflection Texture";
-	)
-	MinFilter = Linear;
-	MagFilter = Linear;
-	MipFilter = Linear;
-	AddressU = Clamp;
-	AddressV = Clamp;
-	AddressW = Clamp;
-SAMPLER_CUBE_END
-#else
-SAMPLER_CUBE_BEGIN( EnvironmentTexture,
-	string UIWidget = "None";
-	string SasBindAddress = "Terrain.EnvironmentTexture";
-	string ResourceType = "Cube";
-	)
-	MinFilter = Linear;
-	MagFilter = Linear;
-	MipFilter = Linear;
-	AddressU = Clamp;
-	AddressV = Clamp;
-	AddressW = Clamp;
-SAMPLER_CUBE_END
-#endif
-
-// ----------------------------------------------------------------------------
-// Editable parameters
-// ----------------------------------------------------------------------------
-SAMPLER_2D_BEGIN( DiffuseTexture,
-	string UIName = "Diffuse Texture";
-	)
-	MinFilter = MinFilterBest;
-	MagFilter = MagFilterBest;
-	MipFilter = MipFilterBest;
-	MaxAnisotropy = 8;
-    AddressU = Wrap;
-    AddressV = Wrap;
-SAMPLER_2D_END
-
-SAMPLER_2D_BEGIN( NormalMap,
-	string UIName = "Normal Texture";
-	)
-	MinFilter = MinFilterBest;
-	MagFilter = MagFilterBest;
-	MipFilter = MipFilterBest;
-	MaxAnisotropy = 8;
-    AddressU = Wrap;
-    AddressV = Wrap;
-SAMPLER_2D_END
-
-#if defined(SUPPORT_BUILDUP)
-SAMPLER_2D_BEGIN( BuildUpMap,
-	string UIName = "Build-Up Texture";
-	)
-	MinFilter = MinFilterBest;
-	MagFilter = MagFilterBest;
-	MipFilter = MipFilterBest;
-	MaxAnisotropy = 8;
-    AddressU = Wrap;
-    AddressV = Wrap;
-SAMPLER_2D_END
-#endif
-
-#if defined(SUPPORT_SPECMAP)
-SAMPLER_2D_BEGIN( SpecMap,
-	string UIName = "Specular Map";
-	)
-	MinFilter = MinFilterBest;
-	MagFilter = MagFilterBest;
-	MipFilter = MipFilterBest;
-	MaxAnisotropy = 8;
-    AddressU = Wrap;
-    AddressV = Wrap;
-SAMPLER_2D_END
-#endif
-
-#if defined(SCROLL_HOUSECOLOR)
-
-SAMPLER_2D_BEGIN( ScrollingMaskTexture,
-	string UIName = "NOD Scrolling Mask";
-	)
-	MinFilter = MinFilterBest;
-	MagFilter = MagFilterBest;
-	MipFilter = MipFilterBest;
-	MaxAnisotropy = 8;
-    AddressU = Wrap;
-    AddressV = Wrap;
-SAMPLER_2D_END
-
-float4 TexCoordTransform_0
-<
-	string UIName = "NOD Scl/Move";
-	string UIWidget = "Spinner";
-	int UIMin = -1000;
-	int UIMax = 1000;
-> = float4(1.0, 1.0, 0.0, 0.0);
-
-//float RecolorMultiplier
-static const float RecolorMultiplier
-<
-	string UIName = "NOD Effect Multiplier"; 
-    string UIWidget = "Slider";
-    float UIMin = 0.0;
-    float UIMax = 10.0;
-    float UIStep = 0.1;
-> = 3.0;
-#endif // defined(SCROLL_HOUSECOLOR)
-
 
 // ----------------------------------------------------------------------------
 // House coloring
 // ----------------------------------------------------------------------------
-#if defined(SUPPORT_RECOLORING) && !defined(SCROLL_HOUSECOLOR)
-
-SAMPLER_2D_BEGIN( RecolorTexture,
-	string UIName = "House Color Tex.";
-	)
-	MinFilter = MinFilterBest;
-	MagFilter = MagFilterBest;
-	MipFilter = MipFilterBest;
-	AddressU = Wrap;
-	AddressV = Wrap;
-SAMPLER_2D_END
-	
-#endif // if defined(SUPPORT_RECOLORING) && !defined(SCROLL_HOUSECOLOR)
 
 #if defined(SUPPORT_RECOLORING)
-
 
 #if defined(_3DSMAX_)
 
@@ -305,29 +120,224 @@ float3 RecolorColor
 
 #else
 
-int NumRecolorColors
+bool HasRecolorColors
 <
 	string UIWidget = "None";
-	string SasBindAddress = "WW3D.NumRecolorColors";
-	bool ExportValue = false;
-> = 0;
+	string SasBindAddress = "WW3D.HasRecolorColors";
+	bool ExportValue = 0;
+>;
 
 float3 RecolorColor
 <
-	string UIWidget = "None";
-	string SasBindAddress = "WW3D.RecolorColor[0]";
-	bool ExportValue = false;
-> = float3(0, 0, 0);
+	bool unmanaged = 1;
+>;
 #endif
-
 
 #else // defined(SUPPORT_RECOLORING)
 
-static const int NumRecolorColors = 0;
+static const bool HasRecolorColors = 0;
 static const float3 RecolorColor = float3(0, 0, 0);
 
 #endif // defined(SUPPORT_RECOLORING)
 
+float OpacityOverride
+<
+	bool unmanaged = 1;
+> = 1.0;
+
+float3 TintColor
+<
+	string UIName = "Tint Color"; 
+    string UIWidget = "Color";
+> = float3(1, 1, 1);
+
+float3 EyePosition
+<
+	string UIName = "Tint Color"; 
+    string UIWidget = "Color";
+>;
+
+// ----------------------------------------------------------------------------
+// Transformations (world transformations are in skinning header)
+// ----------------------------------------------------------------------------
+float4x4 View : View;
+float4x3 ViewI : ViewInverse;
+
+#if defined(_WW3D_)
+float4x4 ViewProjection
+<
+	string UIWidget = "None";
+	string SasBindAddress = "Sas.Camera.WorldToProjection";
+>;
+
+float4x4 GetViewProjection()
+{
+	return ViewProjection;
+}
+#else
+float4x4 Projection : Projection;
+
+float4x4 GetViewProjection()
+{
+	return mul(View, Projection);
+}
+#endif
+
+//---
+
+// float4 WorldBones[128]
+// <
+// 	bool unmanaged = 1;
+// >;
+
+// ----------------------------------------------------------------------------
+// Shadow mapping
+// ----------------------------------------------------------------------------
+int HasShadow
+<
+	string UIWidget = "None";
+	string SasBindAddress = "Sas.HasShadow";
+>;
+
+// DELETE THIS
+ShadowSetup ShadowInfo
+<
+	string UIWidget = "None";
+	string SasBindAddress = "Sas.Shadow[0]";
+>;
+
+SAMPLER_2D_SHADOW( ShadowMap )
+
+// ----------------
+
+float4 Shadowmap_Zero_Zero_OneOverMapSize_OneOverMapSize
+<
+	string UIWidget = "None";
+	string SasBindAddress = "Sas.Shadow[0].Zero_Zero_OneOverMapSize_OneOverMapSize";
+>;
+
+float2 MapCellSize
+<
+	string UIWidget = "None";
+	string SasBindAddress = "Terrain.Map.CellSize";
+> = float2(10, 10);
+
+SAMPLER_2D_BEGIN( MacroSampler,
+	string Texture = "MacroSampler";
+	string UIWidget = "None";
+	string SasBindAddress = "Terrain.MacroTexture";
+	string ResourceName = "ShaderPreviewMacro.dds";
+	)
+	MinFilter = Linear;
+	MagFilter = Linear;
+	MipFilter = Linear;
+    AddressU = Wrap;
+    AddressV = Wrap;
+SAMPLER_2D_END
+
+int _SasGlobal : SasGlobal 
+<
+	string UIWidget = "None";
+	int3 SasVersion = int3(1, 0, 0);
+	int MaxLocalLights = 8;
+	int MaxSupportedInstancingMode = 1;
+>;
+
+// ----------------------------------------------------------------------------
+// Skinning
+// ----------------------------------------------------------------------------
+static const int MaxSkinningBonesPerVertex = 1;
+
+#include "Skinning.fxh"
+
+// MAPS
+
+SAMPLER_2D_BEGIN( CloudTexture,
+	string UIWidget = "None";
+	string SasBindAddress = "Terrain.Cloud.Texture";
+	string ResourceName = "ShaderPreviewCloud.dds";
+	)
+	MinFilter = Linear;
+	MagFilter = Linear;
+	MipFilter = Linear;
+    AddressU = Wrap;
+    AddressV = Wrap;
+SAMPLER_2D_END
+
+// ----------------------------------------------------------------------------
+// Environment map
+// ----------------------------------------------------------------------------
+#if defined(SPECIFY_CUSTOM_ENVMAP)
+SAMPLER_CUBE_BEGIN( EnvironmentTexture,
+	string UIName = "Reflection Texture";
+	)
+	MinFilter = Linear;
+	MagFilter = Linear;
+	MipFilter = Linear;
+	AddressU = Clamp;
+	AddressV = Clamp;
+	AddressW = Clamp;
+SAMPLER_CUBE_END
+#else
+SAMPLER_CUBE_BEGIN( EnvironmentTexture,
+	string Texture = "EnvironmentTexture";
+	string UIWidget = "None";
+	string SasBindAddress = "Objects.LightSpaceEnvironmentMap";
+	string ResourceType = "Cube";
+	)
+	MinFilter = Linear;
+	MagFilter = Linear;
+	MipFilter = Linear;
+	AddressU = Clamp;
+	AddressV = Clamp;
+	AddressW = Clamp;
+SAMPLER_CUBE_END
+#endif
+
+// ----------------------------------------------------------------------------
+// Editable parameters
+// ----------------------------------------------------------------------------
+SAMPLER_2D_BEGIN( DiffuseTexture,
+	string Texture = "DiffuseTexture";
+	string UIName = "Diffuse Texture";
+	)
+	MinFilter = MinFilterBest;
+	MagFilter = MagFilterBest;
+	MipFilter = MipFilterBest;
+	MaxAnisotropy = 8;
+    AddressU = Wrap;
+    AddressV = Wrap;
+SAMPLER_2D_END
+
+SAMPLER_2D_BEGIN( NormalMap,
+	string Texture = "NormalMap";
+	string UIName = "Normal Texture";
+	)
+	MinFilter = MinFilterBest;
+	MagFilter = MagFilterBest;
+	MipFilter = MipFilterBest;
+	MaxAnisotropy = 8;
+    AddressU = Wrap;
+    AddressV = Wrap;
+SAMPLER_2D_END
+
+#if defined(SUPPORT_SPECMAP)
+SAMPLER_2D_BEGIN( SpecMap,
+	string Texture = "SpecMap";
+	string UIName = "Specular Map";
+	)
+	MinFilter = MinFilterBest;
+	MagFilter = MagFilterBest;
+	MipFilter = MipFilterBest;
+	MaxAnisotropy = 8;
+    AddressU = Wrap;
+    AddressV = Wrap;
+SAMPLER_2D_END
+#endif
+
+#if defined(SUPPORT_RECOLORING)
+
+#endif // if defined(SUPPORT_RECOLORING) && !defined(SCROLL_HOUSECOLOR)
 
 #if defined(OBJECTS_ALIEN)
 // Fixed material parameters for Aliens
@@ -411,23 +421,6 @@ bool AlphaTestEnable
 > = false;
 
 // ----------------------------------------------------------------------------
-// Ionized Hull Map
-// ----------------------------------------------------------------------------
-
-#ifdef SUPPORT_IONHULL
-SAMPLER_2D_BEGIN( IonHullTexture,
-	string UIName = "Ion Hull Texture";
-	)
-	MinFilter = MinFilterBest;
-	MagFilter = MagFilterBest;
-	MipFilter = MipFilterBest;
-	MaxAnisotropy = 8;
-    AddressU = Wrap;
-    AddressV = Wrap;
-SAMPLER_2D_END
-#endif
-
-// ----------------------------------------------------------------------------
 // Shroud
 // ----------------------------------------------------------------------------
 ShroudSetup Shroud
@@ -436,6 +429,7 @@ ShroudSetup Shroud
 	string SasBindAddress = "Terrain.Shroud";
 > = DEFAULT_SHROUD;
 
+// DELETE THIS
 int ObjectShroudStatus
 <
 	string UIWidget = "None";
@@ -454,77 +448,10 @@ SAMPLER_2D_BEGIN( ShroudTexture,
 SAMPLER_2D_END
 
 // ----------------------------------------------------------------------------
-// Fog
-// ----------------------------------------------------------------------------
-WW3DFog Fog
-<
-	string UIWidget = "None";
-	string SasBindAddress = "WW3D.Fog";
-> = DEFAULT_FOG_DISABLED;
-
-float OpacityOverride
-<
-	string UIWidget = "None";
-	string SasBindAddress = "WW3D.OpacityOverride";
-> = 1.0;
-
-float4 FlatColorOverride
-<
-	string UIWidget = "None";
-	string SasBindAddress = "WW3D.FlatColor";
->;
-
-
-// ----------------------------------------------------------------------------
-// Transformations (world transformations are in skinning header)
-// ----------------------------------------------------------------------------
-float4x4 View : View;
-float4x3 ViewI : ViewInverse;
-float Time : Time;
-
-#if defined(_WW3D_)
-float4x4 ViewProjection
-<
-	string UIWidget = "None";
-	string SasBindAddress = "Sas.Camera.WorldToProjection";
->;
-
-float4x4 GetViewProjection()
-{
-	return ViewProjection;
-}
-#else
-float4x4 Projection : Projection;
-
-float4x4 GetViewProjection()
-{
-	return mul(View, Projection);
-}
-#endif
-
-// ----------------------------------------------------------------------------
 // Utility functions
 // ----------------------------------------------------------------------------
-#if defined(OBJECTS_ALIEN)
-#if defined(_WW3D_)
-float AlienPulseFactor
-<
-	string UIWidget = "None";
-	string SasBindAddress = "WW3D.AlienPulseFactor";
-> = 1.0;
 
-float CalculateAlienPulseFactor()
-{
-	return AlienPulseFactor;
-}
-#else
-float CalculateAlienPulseFactor()
-{
-	return 4 * (sin(Time * 2) + 1.5);
-}
-#endif
-
-#endif
+float Time : Time;
 
 // ----------------------------------------------------------------------------
 // SHADER: DEFAULT
@@ -539,7 +466,6 @@ struct VSOutput {
 	float4 WorldNormal_AlienPulse : TEXCOORD6_centroid;
 	float4 ShadowMapTexCoord : TEXCOORD7;
 	float4 Color : COLOR0;
-	float Fog : FOG;
 
 #if defined(SUPPORT_BUILDUP)
 	float2 BuildupWarpTexCoord : TEXCOORD3;
@@ -654,7 +580,7 @@ VSOutput VS(VSInputSkinningOneBoneTangentFrame InSkin,
 	Out.ReflectVector.w = shroudTexCoord.y;
 	
 	// Calculate fog
-	Out.Fog = CalculateFog(Fog, worldPosition, ViewI[3]);
+	// Out.Fog = CalculateFog(Fog, worldPosition, ViewI[3]);
 
 	// Alien pulse factor
 #if defined(OBJECTS_ALIEN)
@@ -687,7 +613,7 @@ VSOutput VS_Xenon(VSInputSkinningOneBoneTangentFrame InSkin,
 // ----------------------------------------------------------------------------
 // SHADER: PS
 // ----------------------------------------------------------------------------
-float4 PS(VSOutput In, uniform int numShadows, uniform bool applyShroud,
+float4 PS(VSOutput In, uniform int HasShadow, uniform bool applyShroud,
 	uniform bool fogEnabled, uniform bool recolorEnabled) : COLOR
 {
 	float2 texCoord0 = In.TexCoord0_TexCoord1.xy;
@@ -765,7 +691,7 @@ float4 PS(VSOutput In, uniform int numShadows, uniform bool applyShroud,
 			
 		if (i == 0)
 		{
-			if (numShadows >= 1)
+			if (HasShadow >= 1)
 			{
 				lighting.yz *= shadow( SAMPLER(ShadowMap), In.ShadowMapTexCoord, ShadowInfo);
 			}
@@ -829,7 +755,7 @@ float4 PS(VSOutput In, uniform int numShadows, uniform bool applyShroud,
 
 	if (fogEnabled)
 	{
-		color.xyz = lerp(Fog.Color, color.xyz, In.Fog);
+		// color.xyz = lerp(Fog.Color, color.xyz, In.Fog);
 	}
 
 	if (applyShroud)
@@ -846,7 +772,7 @@ float4 PS(VSOutput In, uniform int numShadows, uniform bool applyShroud,
 // ----------------------------------------------------------------------------
 float4 PS_Xenon( VSOutput In ) : COLOR
 {
-	return PS( In, min(NumShadows, 1), (ObjectShroudStatus == OBJECTSHROUD_PARTIAL_CLEAR), Fog.IsEnabled, (NumRecolorColors > 0) );
+	return PS( In, min(HasShadow, 1), (ObjectShroudStatus == OBJECTSHROUD_PARTIAL_CLEAR), 0, (HasRecolorColors > 0) );
 }
 
 // ----------------------------------------------------------------------------
@@ -904,8 +830,8 @@ technique Default
 			compile VS_VERSION VS_Xenon() );
 
 		PixelShader = ARRAY_EXPRESSION_PS( PS_Array,
-			min(NumShadows, 1) * PS_Multiplier_NumShadows
-			+ (NumRecolorColors > 0) * PS_Multiplier_RecolorEnabled,
+			min(HasShadow, 1) * PS_Multiplier_NumShadows
+			+ (HasRecolorColors > 0) * PS_Multiplier_RecolorEnabled,
 			compile PS_VERSION PS_Xenon() );
 
 		ZEnable = true;
@@ -944,7 +870,6 @@ struct VSOutput_M
 #if defined(OBJECTS_ALIEN)
 	float AlienPulse : TEXCOORD7;
 #endif
-	float Fog : COLOR0;
 };
 
 VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
@@ -1017,7 +942,7 @@ VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 	Out.AlienPulse = CalculateAlienPulseFactor();
 #endif
 		
-	Out.Fog = CalculateFog(Fog, worldPosition, ViewI[3]);
+	// Out.Fog = CalculateFog(Fog, worldPosition, ViewI[3]);
 	
 	return Out;
 }
@@ -1071,7 +996,7 @@ float4 PS_M(VSOutput_M In, uniform bool applyShroud, uniform bool fogEnabled, un
 
 	if (fogEnabled)
 	{
-		color.xyz = lerp(Fog.Color, color.xyz, In.Fog);
+		// color.xyz = lerp(Fog.Color, color.xyz, In.Fog);
 	}
 
 	color.xyz *= tex2D( SAMPLER(ShroudTexture), In.ShroudTexCoord);
@@ -1148,7 +1073,7 @@ technique _Default_M
 		PixelShader = ARRAY_EXPRESSION_PS( PS_M_Array,
 			(ObjectShroudStatus == OBJECTSHROUD_PARTIAL_CLEAR) * PS_M_Multiplier_ApplyShroud
 			+ Fog.IsEnabled * PS_M_Multiplier_FogEnabled
-			+ (NumRecolorColors > 0) * PS_M_Multiplier_RecolorEnabled,
+			+ (HasRecolorColors > 0) * PS_M_Multiplier_RecolorEnabled,
 			NO_ARRAY_ALTERNATIVE);
 
 		ZEnable = true;
@@ -1302,7 +1227,7 @@ technique _Default_L
 			
 		PixelShader = ARRAY_EXPRESSION_PS( PS_L_Array,
 			(ObjectShroudStatus == OBJECTSHROUD_PARTIAL_CLEAR) * PS_L_Multiplier_ApplyShroud
-			+ (NumRecolorColors > 0) * PS_L_Multiplier_RecolorEnabled,
+			+ (HasRecolorColors > 0) * PS_L_Multiplier_RecolorEnabled,
 			NO_ARRAY_ALTERNATIVE );
 			
 		ZEnable = true;

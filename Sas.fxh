@@ -27,9 +27,9 @@ struct SasDirectionalLight
 
 struct SasPointLight
 {
-	float3 Color;			// default: {0, 0, 0}
-	float3 Position;		// default: {0, 0, 0}
-	float  Range;			// default: 0
+	float3 Color;				// default: {0, 0, 0}
+	float3 Position;			// default: {0, 0, 0}
+	float2 Range_Inner_Outer;	// default: {0, 0}
 };
 
 struct SasSpotLight

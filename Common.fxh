@@ -399,6 +399,7 @@ float shadowSimple(sampler2D shadowSampler, float4 shadowTexCoord, ShadowSetup s
 	
 #define SAMPLER_2D_SHADOW( shadowMapName ) \
 	SAMPLER_2D_BEGIN( shadowMapName, \
+		string Texture = "ShadowMap"; \
 		string UIWidget = "None"; \
 		string SasBindAddress = "Sas.Shadow[0].ShadowMap"; \
 		) \
@@ -462,7 +463,9 @@ float CalculatePointLightAttenuation(SasPointLight light, float lightDistance)
 	// This is the new way.
 
 	// Make a squared fall-off
-	float attenuation = max(0, 1.0 - lightDistance / light.Range);
+	
+	// CHANGE THIS TO ACCEPT FLOAT 2
+	float attenuation = max(0, 1.0 - lightDistance / light.Range_Inner_Outer);
 	attenuation *= attenuation;
 
 	return attenuation;
