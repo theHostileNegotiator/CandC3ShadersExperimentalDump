@@ -288,11 +288,11 @@ int BlendMode
 
         if( UseLowLODBones )
         {
-		    worldPivotPosition = GetFirstBonePosition_L(InSkin.BlendIndices, NumJointsPerVertex);
+		    worldPivotPosition = GetFirstBonePosition_L(InSkin.BlendIndices, NumJointsPerVertex).xyz;
         }
         else
         {
-		    worldPivotPosition = GetFirstBonePosition(InSkin.BlendIndices, NumJointsPerVertex);
+		    worldPivotPosition = GetFirstBonePosition(InSkin.BlendIndices, NumJointsPerVertex).xyz;
         }
 
         float pivotOffset = WorldPosition.z - worldPivotPosition.z;

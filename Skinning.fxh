@@ -292,7 +292,7 @@ void CalculatePositionAndTangentFrame(VSInputSkinningOneBoneTangentFrame InSkin,
 {
 	if (NumJointsPerVertex > 0)
 	{
-		int index = D3DCOLORtoUBYTE4(InSkin.BlendIndices).x * 2;
+		int index = InSkin.BlendIndices.x * 2;
 
 		WorldPosition = BoneTransformPosition(WorldBones[index], WorldBones[index+1], InSkin.Position);
 		WorldNormal = BoneTransformDirection(WorldBones[index], InSkin.Normal);
@@ -325,7 +325,7 @@ void CalculatePositionAndTangentFrame_L(VSInputSkinningOneBoneTangentFrame InSki
 {
 	if (NumJointsPerVertex > 0)
 	{
-		int index = D3DCOLORtoUBYTE4(InSkin.BlendIndices).x * 2;
+		int index = InSkin.BlendIndices.x * 2;
 
 		WorldPosition = BoneTransformPosition(WorldBones_L[index], WorldBones_L[index+1], InSkin.Position);
 		WorldNormal = BoneTransformDirection(WorldBones_L[index], InSkin.Normal);
@@ -338,9 +338,9 @@ void CalculatePositionAndTangentFrame_L(VSInputSkinningOneBoneTangentFrame InSki
 	{
 #if defined(USE_NON_SKINNING_WORLD_MATRIX)
 		WorldPosition = mul(float4(InSkin.Position, 1), World);
-		WorldNormal = normalize(mul(InSkin.Normal, (float3x3)World));
-		WorldTangent = normalize(mul(InSkin.Tangent, (float3x3)World));
-		WorldBinormal = normalize(mul(InSkin.Binormal, (float3x3)World));
+		WorldNormal = mul(InSkin.Normal, (float3x3)World);
+		WorldTangent = mul(InSkin.Tangent, (float3x3)World);
+		WorldBinormal = mul(InSkin.Binormal, (float3x3)World);
 #else
 		WorldPosition = BoneTransformPosition(WorldBones_L[0], WorldBones_L[0+1], InSkin.Position);
 		WorldNormal = BoneTransformDirection(WorldBones_L[0], InSkin.Normal);
@@ -352,38 +352,38 @@ void CalculatePositionAndTangentFrame_L(VSInputSkinningOneBoneTangentFrame InSki
 }
 
 
-float3 GetFirstBonePosition(float4 BlendIndices, int NumJointsPerVertex)
+float4 GetFirstBonePosition(float4 BlendIndices, int NumJointsPerVertex)
 {
 	if (NumJointsPerVertex > 0)
 	{
-		int index = D3DCOLORtoUBYTE4(BlendIndices).x * 2;
+		int index = BlendIndices.x;
 
-		return WorldBones[index+1].xyz;
+		return WorldBones[index*2+1];
 	}
 	else
 	{
 #if defined(USE_NON_SKINNING_WORLD_MATRIX)
-		return World[3];
+		return float4(World[3], 1);
 #else
-		return WorldBones[0+1].xyz;
+		return WorldBones[0+1];
 #endif
 	}
 }
 
-float3 GetFirstBonePosition_L(float4 BlendIndices, int NumJointsPerVertex)
+float4 GetFirstBonePosition_L(float4 BlendIndices, int NumJointsPerVertex)
 {
 	if (NumJointsPerVertex > 0)
 	{
-		int index = D3DCOLORtoUBYTE4(BlendIndices).x * 2;
+		int index = BlendIndices.x;
 
-		return WorldBones_L[index+1].xyz;
+		return WorldBones_L[index*2+1];
 	}
 	else
 	{
 #if defined(USE_NON_SKINNING_WORLD_MATRIX)
-		return World[3];
+		return float4(World[3], 1);
 #else
-		return WorldBones_L[0+1].xyz;
+		return WorldBones_L[0+1];
 #endif
 	}
 }

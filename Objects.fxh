@@ -463,8 +463,7 @@ struct VSOutput {
 	float4 LightVector[NumDirectionalLightsPerPixel] : TEXCOORD1_centroid;
 	float4 HalfEyeLightVector : TEXCOORD4_centroid;
 	float4 ReflectVector : TEXCOORD5_centroid;
-	float4 WorldNormal_AlienPulse : TEXCOORD6_centroid;
-	float4 ShadowMapTexCoord : TEXCOORD7;
+	float4 ShadowMapTexCoord : TEXCOORD6;
 	float4 Color : COLOR0;
 
 #if defined(SUPPORT_BUILDUP)
@@ -481,9 +480,6 @@ struct VSOutput {
 // ----------------------------------------------------------------------------
 VSOutput VS(VSInputSkinningOneBoneTangentFrame InSkin, 
 		float2 TexCoord : TEXCOORD0,
-#if defined(SUPPORT_BUILDUP)
-		float2 BuildupTexCoord : TEXCOORD1,
-#endif
 		uniform int numJointsPerVertex)
 {
 	USE_DIRECTIONAL_LIGHT_INTERACTIVE(DirectionalLight, 0);
@@ -518,9 +514,6 @@ VSOutput VS(VSInputSkinningOneBoneTangentFrame InSkin,
 	Out.ReflectVector.xyz = worldEyeDir;
 
 	Out.Color = float4(AmbientLightColor * AmbientColor, OpacityOverride);
-#if defined(SUPPORT_BUILDUP)
-	Out.Color.w = 1; // Buildup abuses OpacityOverride as buildup percentage
-#endif
 
 
 	// Compute remaining directional lights per vertex, others will be done in pixel shader
@@ -530,10 +523,6 @@ VSOutput VS(VSInputSkinningOneBoneTangentFrame InSkin,
 		diffuseLight += DirectionalLight[i].Color * max(0, dot(worldNormal, DirectionalLight[i].Direction));
 	}
 
-#ifdef PER_PIXEL_POINT_LIGHT
-	Out.WorldNormal_AlienPulse.xyz = worldNormal * 0.5 + 0.5;
-	Out.WorldPosition = worldPosition;
-#else
 #if defined(SUPPORT_POINT_LIGHTS)
 	// Compute point lights
 	for (int i = 0; i < NumPointLights; i++)
@@ -546,8 +535,6 @@ VSOutput VS(VSInputSkinningOneBoneTangentFrame InSkin,
 		
 		diffuseLight += PointLight[i].Color * attenuation * max(0, dot(worldNormal, direction));
 	}
-#endif
-	Out.WorldNormal_AlienPulse.xyz = worldNormal;
 #endif
 
 	Out.Color.xyz += diffuseLight * DiffuseColor;
@@ -562,14 +549,7 @@ VSOutput VS(VSInputSkinningOneBoneTangentFrame InSkin,
 	Out.LightVector[0].w = cloudTexCoord.x;
 	Out.LightVector[1].w = cloudTexCoord.y;
 
-#if defined(SCROLL_HOUSECOLOR)
-	float2 texCoord1 = TexCoord * TexCoordTransform_0.xy + Time * TexCoordTransform_0.zw;
-#elif defined(SUPPORT_BUILDUP)
-	float2 texCoord1 = BuildupTexCoord;
-	Out.BuildupWarpTexCoord = TexCoord * 3 + Time * 0.2;
-#else
 	float2 texCoord1 = TexCoord;
-#endif
 
 	Out.TexCoord0_TexCoord1.zw = texCoord1.yx;
 	
@@ -581,13 +561,6 @@ VSOutput VS(VSInputSkinningOneBoneTangentFrame InSkin,
 	
 	// Calculate fog
 	// Out.Fog = CalculateFog(Fog, worldPosition, ViewI[3]);
-
-	// Alien pulse factor
-#if defined(OBJECTS_ALIEN)
-	Out.WorldNormal_AlienPulse.w = CalculateAlienPulseFactor();
-#else
-	Out.WorldNormal_AlienPulse.w = 0;
-#endif
 
 	return Out;
 }
@@ -619,8 +592,6 @@ float4 PS(VSOutput In, uniform int HasShadow, uniform bool applyShroud,
 	float2 texCoord0 = In.TexCoord0_TexCoord1.xy;
 	float2 texCoord1 = In.TexCoord0_TexCoord1.wz;
 	float2 cloudTexCoord = float2(In.LightVector[0].w, In.LightVector[1].w);
-	float3 worldNormal = In.WorldNormal_AlienPulse.xyz;
-	float alienPulse = In.WorldNormal_AlienPulse.w;
 
 	// Get diffuse color
 	float4 baseTexture = tex2D( SAMPLER(DiffuseTexture), texCoord0);
@@ -666,7 +637,7 @@ float4 PS(VSOutput In, uniform int HasShadow, uniform bool applyShroud,
 
 #else // !OBJECTS_ALIEN
 	// Envmap calculations
-	float3 Nn = normalize(worldNormal + bumpNormal * 0.5);
+	float3 Nn = normalize(bumpNormal * 0.5);
 	float3 Vn = /*normalize*/(In.ReflectVector);
 	float3 reflVect = -reflect(Vn,Nn);
 	float3 envcolor = EnvMult * texCUBE( SAMPLER(EnvironmentTexture), reflVect).xyz;
@@ -1118,7 +1089,7 @@ VSOutput_L VS_L(VSInputSkinningOneBoneTangentFrame InSkin, float2 TexCoord : TEX
 	float3 worldTangent = 0;
 	float3 worldBinormal = 0;
 
-	CalculatePositionAndTangentFrame(InSkin, numJointsPerVertex, worldPosition, worldNormal, worldTangent, worldBinormal);
+	CalculatePositionAndTangentFrame_L(InSkin, numJointsPerVertex, worldPosition, worldNormal, worldTangent, worldBinormal);
 
 	// transform position to projection space
 	Out.Position = mul(float4(worldPosition, 1), GetViewProjection());
@@ -1128,27 +1099,12 @@ VSOutput_L VS_L(VSInputSkinningOneBoneTangentFrame InSkin, float2 TexCoord : TEX
 	for (int i = 0; i < NumDirectionalLights; i++)
 	{
 		float3 lightColor = DirectionalLight[i].Color;
-		// if (i == 0)
-		// {
-		// 	lightColor *= NoCloudMultiplier;
-		// }
 
 		diffuseLight += lightColor * max(0, dot(worldNormal, DirectionalLight[i].Direction));
 	}
-
-#if defined(SUPPORT_POINT_LIGHTS)
-	// Compute point lights
-	for (int i = 0; i < NumPointLights; i++)
-	{
-		float3 direction = PointLight[i].Position - worldPosition;
-		float lightDistance = length(direction);
-		direction /= lightDistance;
-		float attenuation = CalculatePointLightAttenuation(PointLight[i], lightDistance);
-		diffuseLight += PointLight[i].Color * attenuation * max(0, dot(worldNormal, direction));
-	}
-#endif
-
+	
 	Out.Color_Opacity.xyz = AmbientLightColor * AmbientColor + diffuseLight * DiffuseColor;
+	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex).w;
 	Out.Color_Opacity.w = OpacityOverride;
 	Out.Color_Opacity *= VertexColor;
 	Out.BaseTexCoord = TexCoord.xyyx;
@@ -1286,6 +1242,7 @@ VSOutput_CreateShadowMap CreateShadowMapVS(VSInputSkinningOneBoneTangentFrame In
 	Out.Depth = Out.Position.z / Out.Position.w;	
 	Out.TexCoord0 = TexCoord;	
 
+	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex).w;
 	Out.Color = VertexColor.w * OpacityOverride;
 
 	return Out;

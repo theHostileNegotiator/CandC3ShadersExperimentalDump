@@ -4,6 +4,7 @@
 // FX Shader for GDI vehicles and structures. GDI infantry should use Infantry.fx
 //////////////////////////////////////////////////////////////////////////////
 
+#define SUPPORT_POINT_LIGHTS 1
 #define SUPPORT_RECOLORING 1
 #define SUPPORT_SPECMAP 1
 

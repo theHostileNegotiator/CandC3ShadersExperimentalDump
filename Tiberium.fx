@@ -429,7 +429,7 @@ VSOutput_U VS_U(VSInputSkinningOneBoneTangentFrame InSkin,
 
 
 	// Random glow for tiberium crystals
-	float3 objectCenterWorld = GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex);
+	float3 objectCenterWorld = GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex).xyz;
 	float randomOffset = GetRandomFloatValue(float2(0, 20), 3, VertexColor.w * 255 + (objectCenterWorld.x + objectCenterWorld.y) * 100);
 	float speed = GetRandomFloatValue(TimeGlowSpeedRange, 7, VertexColor.w * 300 + (objectCenterWorld.x + objectCenterWorld.y) * 30);
 	float strength = saturate(sin(Time * speed + randomOffset) * 0.5 - 0.5 + TimeGlowActiveRatio) / max(TimeGlowActiveRatio, 0.001);
@@ -710,7 +710,7 @@ VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 	Out.ReflectVector_Fog.w = CalculateFog(Fog, worldPosition, ViewI[3]);
 
 	// Random glow for tiberium crystals
-	float3 objectCenterWorld = GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex);
+	float3 objectCenterWorld = GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex).xyz;
 	float randomOffset = GetRandomFloatValue(float2(0, 20), 3, VertexColor.w * 255 + (objectCenterWorld.x + objectCenterWorld.y) * 100);
 	float speed = GetRandomFloatValue(TimeGlowSpeedRange, 7, VertexColor.w * 300 + (objectCenterWorld.x + objectCenterWorld.y) * 30);
 	float strength = saturate(sin(Time * speed + randomOffset) * 0.5 - 0.5 + TimeGlowActiveRatio) / max(TimeGlowActiveRatio, 0.001);
