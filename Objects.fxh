@@ -348,7 +348,7 @@ static const float3 SpecularColor = float3(0.788, 0.761, 1.0);
 static const float SpecularExponent = 15.0;
 
 #elif defined(MATERIAL_PARAMS_GDI)
-// Fixed material parameters for GDI
+// Fixed material parameters for Allies
 static const float BumpScale = 1.5;
 static const float3 AmbientColor = float3(0.1, 0.1, 0.1);
 static const float4 DiffuseColor = float4(1.0, 1.0, 1.0, 0);
@@ -356,7 +356,7 @@ static const float3 SpecularColor = float3(1.0, 1.0, 1.0);
 static const float SpecularExponent = 50.0;
 
 #elif defined(MATERIAL_PARAMS_NOD)
-// Fixed material parameters for NOD
+// Fixed material parameters for Soviets
 static const float BumpScale = 1.5;
 static const float3 AmbientColor = float3(0.3, 0.3, 0.3);
 static const float4 DiffuseColor = float4(0.584, 0.624, 0.733, 1.0);
@@ -476,9 +476,9 @@ struct VSOutput {
 };
 
 // ----------------------------------------------------------------------------
-// SHADER: VS
+// SHADER: VS_H
 // ----------------------------------------------------------------------------
-VSOutput VS(VSInputSkinningOneBoneTangentFrame InSkin, 
+VSOutput VS_H(VSInputSkinningOneBoneTangentFrame InSkin, 
 		float2 TexCoord : TEXCOORD0,
 		uniform int numJointsPerVertex)
 {
@@ -575,7 +575,7 @@ VSOutput VS_Xenon(VSInputSkinningOneBoneTangentFrame InSkin,
 #endif
 		)
 {
-	return VS( InSkin,
+	return VS_H( InSkin,
 		TexCoord,
 #if defined(SUPPORT_BUILDUP)
 		BuildupTexCoord,
@@ -584,9 +584,9 @@ VSOutput VS_Xenon(VSInputSkinningOneBoneTangentFrame InSkin,
 }
 
 // ----------------------------------------------------------------------------
-// SHADER: PS
+// SHADER: PS_H
 // ----------------------------------------------------------------------------
-float4 PS(VSOutput In, uniform int HasShadow, uniform bool applyShroud,
+float4 PS_H(VSOutput In, uniform int HasShadow, uniform bool applyShroud,
 	uniform bool fogEnabled, uniform bool recolorEnabled) : COLOR
 {
 	float2 texCoord0 = In.TexCoord0_TexCoord1.xy;
@@ -743,7 +743,7 @@ float4 PS(VSOutput In, uniform int HasShadow, uniform bool applyShroud,
 // ----------------------------------------------------------------------------
 float4 PS_Xenon( VSOutput In ) : COLOR
 {
-	return PS( In, min(HasShadow, 1), (ObjectShroudStatus == OBJECTSHROUD_PARTIAL_CLEAR), 0, (HasRecolorColors > 0) );
+	return PS_H( In, min(HasShadow, 1), (ObjectShroudStatus == OBJECTSHROUD_PARTIAL_CLEAR), 0, (HasRecolorColors > 0) );
 }
 
 // ----------------------------------------------------------------------------
@@ -752,11 +752,11 @@ float4 PS_Xenon( VSOutput In ) : COLOR
 DEFINE_ARRAY_MULTIPLIER( VS_Multiplier_Final = 2 );
 
 #define VS_NumJointsPerVertex \
-	compile vs_3_0 VS(0), \
-	compile vs_3_0 VS(1)
+	compile vs_3_0 VS_H(0), \
+	compile vs_3_0 VS_H(1)
 
 #if SUPPORTS_SHADER_ARRAYS
-vertexshader VS_Array[VS_Multiplier_Final] =
+vertexshader VS_H_Array[VS_Multiplier_Final] =
 {
 	VS_NumJointsPerVertex
 };
@@ -765,8 +765,8 @@ vertexshader VS_Array[VS_Multiplier_Final] =
 DEFINE_ARRAY_MULTIPLIER( PS_Multiplier_NumShadows = 1 );
 
 #define PS_NumShadows(recolorEnabled) \
-	compile ps_3_0 PS(0, false, false, recolorEnabled), \
-	compile ps_3_0 PS(1, false, false, recolorEnabled)
+	compile ps_3_0 PS_H(0, false, false, recolorEnabled), \
+	compile ps_3_0 PS_H(1, false, false, recolorEnabled)
 
 DEFINE_ARRAY_MULTIPLIER( PS_Multiplier_RecolorEnabled = PS_Multiplier_NumShadows * 2 );
 	
@@ -777,7 +777,7 @@ DEFINE_ARRAY_MULTIPLIER( PS_Multiplier_RecolorEnabled = PS_Multiplier_NumShadows
 DEFINE_ARRAY_MULTIPLIER( PS_Multiplier_Final = PS_Multiplier_RecolorEnabled * 2 );
 
 #if SUPPORTS_SHADER_ARRAYS
-pixelshader PS_Array[PS_Multiplier_Final] =
+pixelshader PS_H_Array[PS_Multiplier_Final] =
 {
 	PS_RecolorEnabled
 };
@@ -796,11 +796,11 @@ technique Default
 		USE_EXPRESSION_EVALUATOR("Objects")
 	>
 	{
-		VertexShader = ARRAY_EXPRESSION_VS( VS_Array,
+		VertexShader = ARRAY_EXPRESSION_VS( VS_H_Array,
 			min(NumJointsPerVertex, 1), 
 			compile VS_VERSION VS_Xenon() );
 
-		PixelShader = ARRAY_EXPRESSION_PS( PS_Array,
+		PixelShader = ARRAY_EXPRESSION_PS( PS_H_Array,
 			min(HasShadow, 1) * PS_Multiplier_NumShadows
 			+ (HasRecolorColors > 0) * PS_Multiplier_RecolorEnabled,
 			compile PS_VERSION PS_Xenon() );
@@ -831,23 +831,18 @@ technique Default
 struct VSOutput_M
 {
 	float4 Position : POSITION;
-	float3 Color : TEXCOORD1; // Allows strong overbrightness
-	float2 TexCoord0 : TEXCOORD0;
-	float3 LightVector : TEXCOORD2;
-	float3 HalfEyeLightVector : TEXCOORD3;
-	float2 ShroudTexCoord : TEXCOORD4;
-	float2 CloudTexCoord : TEXCOORD5;
-	float2 TexCoord1 : TEXCOORD6;
-#if defined(OBJECTS_ALIEN)
-	float AlienPulse : TEXCOORD7;
-#endif
+	float4 TexCoord0 : TEXCOORD0;
+	float4 LightVector : TEXCOORD1_centroid;
+	float3 HalfEyeLightVector : TEXCOORD2_centroid;
+	float4 ShroudTexCoord : TEXCOORD3;
+	float4 ShadowTexCoord : TEXCOORD4;
+	float2 MapCellTexCoord : TEXCOORD5;
+	float4 Color : COLOR;
 };
 
 VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 		float2 TexCoord : TEXCOORD0,
-#if defined(SUPPORT_BUILDUP)
-		float2 BuildupTexCoord : TEXCOORD1,
-#endif
+		float4 VertexColor : COLOR,
 		uniform int numJointsPerVertex)
 {
 	USE_DIRECTIONAL_LIGHT_INTERACTIVE(DirectionalLight, 0);
@@ -865,13 +860,13 @@ VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 	Out.Position = mul(float4(worldPosition, 1), GetViewProjection());
 
 	// Compute view direction in world space
-	float3 worldEyeDir = normalize(ViewI[3] - worldPosition);
+	float3 worldEyeDir = normalize(EyePosition - worldPosition);
 	
 	// Build 3x3 tranform from object to tangent space
 	float3x3 worldToTangentSpace = transpose(float3x3(-worldBinormal, -worldTangent, worldNormal));
 
 	// Compute lighting direction in tangent space
-	Out.LightVector = mul(DirectionalLight[0].Direction, worldToTangentSpace);
+	Out.LightVector = float4(mul(DirectionalLight[0].Direction, worldToTangentSpace), 0);
 
 	// Compute half angle direction between light and view direction in tangent space
 	Out.HalfEyeLightVector = normalize(mul(DirectionalLight[0].Direction + worldEyeDir, worldToTangentSpace));
@@ -883,37 +878,15 @@ VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 		diffuseLight += DirectionalLight[i].Color * max(0, dot(worldNormal, DirectionalLight[i].Direction));
 	}
 
-#if defined(SUPPORT_POINT_LIGHTS)
-	// Compute point lights
-	for (int i = 0; i < NumPointLights; i++)
-	{
-		float3 direction = PointLight[i].Position - worldPosition;
-		float lightDistance = length(direction);
-		direction /= lightDistance;	
-		float attenuation = CalculatePointLightAttenuation(PointLight[i], lightDistance);	
-		diffuseLight += PointLight[i].Color * attenuation * max(0, dot(worldNormal, direction));
-	}
-#endif
-
-	Out.Color = AmbientLightColor * AmbientColor + diffuseLight * DiffuseColor;
-	Out.TexCoord0 = TexCoord.xy;
-	Out.ShroudTexCoord = CalculateShroudTexCoord(Shroud, worldPosition);
-	Out.CloudTexCoord = CalculateCloudTexCoord(Cloud, worldPosition, Time);
-	
-#if defined(SCROLL_HOUSECOLOR)
-	Out.TexCoord1 = TexCoord * TexCoordTransform_0.xy + Time * TexCoordTransform_0.zw;
-#elif defined(SUPPORT_BUILDUP)
-	Out.TexCoord1 = BuildupTexCoord;
-#else
-	Out.TexCoord1 = TexCoord;
-#endif
-
-	// Alien pulse factor
-#if defined(OBJECTS_ALIEN)
-	Out.AlienPulse = CalculateAlienPulseFactor();
-#endif
-		
-	// Out.Fog = CalculateFog(Fog, worldPosition, ViewI[3]);
+	Out.Color.xyz = AmbientLightColor * AmbientColor + diffuseLight * DiffuseColor;
+	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex).w;
+	Out.Color.w = OpacityOverride;
+	Out.Color *= VertexColor;
+	Out.TexCoord0 = TexCoord.xyyx;
+	Out.ShroudTexCoord.xy = CalculateShroudTexCoord(Shroud, worldPosition);
+	Out.ShroudTexCoord.zw = CalculateCloudTexCoord(Cloud, worldPosition, Time);
+	Out.ShadowTexCoord = CalculateShadowMapTexCoord(ShadowInfo, worldPosition);
+	Out.MapCellTexCoord = float2(1, -1) * (worldPosition.xy / (MapCellSize.x * 66));
 	
 	return Out;
 }
@@ -925,13 +898,6 @@ float4 PS_M(VSOutput_M In, uniform bool applyShroud, uniform bool fogEnabled, un
 {
 	// Get diffuse color
 	float4 baseTexture = tex2D( SAMPLER(DiffuseTexture), In.TexCoord0);
-
-	// Get bump map normal
-	float3 bumpNormal = (float3)tex2D(SAMPLER(NormalMap), In.TexCoord0) * 2.0 - 1.0;
-	// Scale normal to increase/decrease bump effect
-	bumpNormal.xy *= BumpScale;
-	bumpNormal = normalize(bumpNormal);
-	//bumpNormal = float3(0, 0, 1);
 
 	float3 specularColor = SpecularColor;
 
@@ -950,12 +916,19 @@ float4 PS_M(VSOutput_M In, uniform bool applyShroud, uniform bool fogEnabled, un
 	specularColor = 3.0 * SpecularColor * specularStrength;
 #endif
 
+	// Get bump map normal
+	float3 bumpNormal = (float3)tex2D(SAMPLER(NormalMap), In.TexCoord0) * 2.0 - 1.0;
+	// Scale normal to increase/decrease bump effect
+	bumpNormal.xy *= BumpScale;
+	bumpNormal = normalize(bumpNormal);
+	//bumpNormal = float3(0, 0, 1);
+
 	float3 diffuse = baseTexture.xyz;
 
 	// Sample cloud texture
 	float3 cloud = float3(1, 1, 1);			
 #if defined(_WW3D_) && !defined(_W3DVIEW_)
-	cloud = tex2D( SAMPLER(CloudTexture), In.CloudTexCoord);
+	cloud = tex2D( SAMPLER(CloudTexture), In.ShroudTexCoord.zw);
 #endif
 
 	// Compute lighting
@@ -970,7 +943,7 @@ float4 PS_M(VSOutput_M In, uniform bool applyShroud, uniform bool fogEnabled, un
 		// color.xyz = lerp(Fog.Color, color.xyz, In.Fog);
 	}
 
-	color.xyz *= tex2D( SAMPLER(ShroudTexture), In.ShroudTexCoord);
+	color.xyz *= tex2D( SAMPLER(ShroudTexture), In.ShroudTexCoord.xy);
 
 	color.a = baseTexture.w * OpacityOverride;
 	
