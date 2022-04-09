@@ -304,9 +304,9 @@ void CalculatePositionAndTangentFrame(VSInputSkinningOneBoneTangentFrame InSkin,
 	{
 #if defined(USE_NON_SKINNING_WORLD_MATRIX)
 		WorldPosition = mul(float4(InSkin.Position, 1), World);
-		WorldNormal = normalize(mul(InSkin.Normal, (float3x3)World));
-		WorldTangent = normalize(mul(InSkin.Tangent, (float3x3)World));
-		WorldBinormal = normalize(mul(InSkin.Binormal, (float3x3)World));
+		WorldNormal = mul(InSkin.Normal, (float3x3)World);
+		WorldTangent = mul(InSkin.Tangent, (float3x3)World);
+		WorldBinormal = mul(InSkin.Binormal, (float3x3)World);
 #else
 		WorldPosition = BoneTransformPosition(WorldBones[0], WorldBones[0+1], InSkin.Position);
 		WorldNormal = BoneTransformDirection(WorldBones[0], InSkin.Normal);

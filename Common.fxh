@@ -252,6 +252,8 @@ struct ShadowSetup
 	float4 Zero_Zero_OneOverMapSize_OneOverMapSize; // The component layout is optimized so that ps_2_0 swizzles can be used
 };
 
+// float4x4 ShadowMapWorldToShadow;
+
 static const float shadowZBias = 0.0015; // Can use 0.001 with post processing pass
 
 float4 CalculateShadowMapTexCoord(ShadowSetup shadowSetup, float3 worldPosition)
@@ -463,8 +465,6 @@ float CalculatePointLightAttenuation(SasPointLight light, float lightDistance)
 	// This is the new way.
 
 	// Make a squared fall-off
-	
-	// CHANGE THIS TO ACCEPT FLOAT 2
 	float attenuation = max(0, 1.0 - lightDistance / light.Range_Inner_Outer);
 	attenuation *= attenuation;
 

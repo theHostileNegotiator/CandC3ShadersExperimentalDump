@@ -352,7 +352,7 @@ static const float SpecularExponent = 15.0;
 static const float BumpScale = 1.5;
 static const float3 AmbientColor = float3(0.1, 0.1, 0.1);
 static const float4 DiffuseColor = float4(1.0, 1.0, 1.0, 0);
-static const float3 SpecularColor = float3(1.0, 1.0, 1.0);
+static const float3 SpecularColor = float3(0.8, 0.8, 0.8);
 static const float SpecularExponent = 50.0;
 
 #elif defined(MATERIAL_PARAMS_NOD)
@@ -835,7 +835,7 @@ struct VSOutput_M
 	float4 LightVector : TEXCOORD1_centroid;
 	float3 HalfEyeLightVector : TEXCOORD2_centroid;
 	float4 ShroudTexCoord : TEXCOORD3;
-	float4 ShadowTexCoord : TEXCOORD4;
+	float4 ShadowMapTexCoord : TEXCOORD4;
 	float2 MapCellTexCoord : TEXCOORD5;
 	float4 Color : COLOR;
 };
@@ -885,7 +885,7 @@ VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 	Out.TexCoord0 = TexCoord.xyyx;
 	Out.ShroudTexCoord.xy = CalculateShroudTexCoord(Shroud, worldPosition);
 	Out.ShroudTexCoord.zw = CalculateCloudTexCoord(Cloud, worldPosition, Time);
-	Out.ShadowTexCoord = CalculateShadowMapTexCoord(ShadowInfo, worldPosition);
+	Out.ShadowMapTexCoord = CalculateShadowMapTexCoord(ShadowInfo, worldPosition);
 	Out.MapCellTexCoord = float2(1, -1) * (worldPosition.xy / (MapCellSize.x * 66));
 	
 	return Out;
@@ -894,10 +894,13 @@ VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 // ----------------------------------------------------------------------------
 // Shader: PS_M
 // ----------------------------------------------------------------------------
-float4 PS_M(VSOutput_M In, uniform bool applyShroud, uniform bool fogEnabled, uniform bool recolorEnabled) : COLOR
+float4 PS_M(VSOutput_M In, uniform bool HasShadow, uniform bool recolorEnabled) : COLOR
 {
 	// Get diffuse color
 	float4 baseTexture = tex2D( SAMPLER(DiffuseTexture), In.TexCoord0);
+	
+	float4 color;
+	color.w = baseTexture.w * In.Color.w;
 
 	float3 specularColor = SpecularColor;
 
@@ -912,40 +915,45 @@ float4 PS_M(VSOutput_M In, uniform bool applyShroud, uniform bool fogEnabled, un
 		baseTexture.xyz += HouseColorStrength * (baseTexture.xyz * RecolorColor * 2 - baseTexture.xyz);
 	}
 #endif
-
-	specularColor = 3.0 * SpecularColor * specularStrength;
+	specularColor *= specularStrength;
 #endif
+
+	color.xyz = baseTexture * In.Color.xyz;
+
+	float3 diffuse = baseTexture.xyz * DiffuseColor;
 
 	// Get bump map normal
 	float3 bumpNormal = (float3)tex2D(SAMPLER(NormalMap), In.TexCoord0) * 2.0 - 1.0;
 	// Scale normal to increase/decrease bump effect
 	bumpNormal.xy *= BumpScale;
 	bumpNormal = normalize(bumpNormal);
-	//bumpNormal = float3(0, 0, 1);
 
-	float3 diffuse = baseTexture.xyz;
+	// Compute lighting
 
+	float3 lightVec = In.LightVector.xyz;
+	float3 halfVec  = In.HalfEyeLightVector.xyz;
+
+	float4 diffuseTerm = dot( bumpNormal, lightVec );
+	float4 specularTerm = dot( bumpNormal, halfVec );
+
+	float4 lighting = lit( diffuseTerm, specularTerm, SpecularExponent );
+
+	if (HasShadow)
+	{
+		lighting.yz *= shadow( SAMPLER(ShadowMap), In.ShadowMapTexCoord, ShadowInfo);
+	}
+	
 	// Sample cloud texture
 	float3 cloud = float3(1, 1, 1);			
 #if defined(_WW3D_) && !defined(_W3DVIEW_)
 	cloud = tex2D( SAMPLER(CloudTexture), In.ShroudTexCoord.zw);
 #endif
 
-	// Compute lighting
-	float4 lighting = lit(dot(bumpNormal, In.LightVector), dot(bumpNormal, In.HalfEyeLightVector), SpecularExponent);
-	
-	float4 color;	
-	color.xyz = In.Color * diffuse;
-	color.xyz += DirectionalLight[0].Color * cloud * (diffuse * DiffuseColor * lighting.y + specularColor * lighting.z);
+	color.xyz += DirectionalLight[0].Color * cloud * (diffuse * lighting.y + specularColor * lighting.z);
 
-	if (fogEnabled)
-	{
-		// color.xyz = lerp(Fog.Color, color.xyz, In.Fog);
-	}
+	color.xyz *= TintColor;
 
 	color.xyz *= tex2D( SAMPLER(ShroudTexture), In.ShroudTexCoord.xy);
-
-	color.a = baseTexture.w * OpacityOverride;
 	
 	return color;
 }
@@ -953,7 +961,7 @@ float4 PS_M(VSOutput_M In, uniform bool applyShroud, uniform bool fogEnabled, un
 // ----------------------------------------------------------------------------
 // Arrays: Default_M
 // ----------------------------------------------------------------------------
-DEFINE_ARRAY_MULTIPLIER( VS_M_Multiplier_Final = 2 );
+#define VS_M_Multiplier_Final 2
 
 #define VS_M_NumJointsPerVertex \
 	compile VS_VERSION_HIGH VS_M(0), \
@@ -966,28 +974,19 @@ vertexshader VS_M_Array[VS_M_Multiplier_Final] =
 };
 #endif
 
-// ----------------------------------------------------------------------------
-// Replace Shroud with Shadowmap
-// ----------------------------------------------------------------------------
+#define PS_M_Multiplier_HasShadows 1
 
-DEFINE_ARRAY_MULTIPLIER( PS_M_Multiplier_ApplyShroud = 1 );
+#define PS_M_HasShadows(recolorEnabled) \
+	compile PS_VERSION_HIGH PS_M(false, recolorEnabled), \
+	compile PS_VERSION_HIGH PS_M(true, recolorEnabled)
 
-#define PS_M_ApplyShroud(fogEnabled, recolorEnabled) \
-	compile PS_VERSION_HIGH PS_M(true, fogEnabled, recolorEnabled)
-
-DEFINE_ARRAY_MULTIPLIER( PS_M_Multiplier_FogEnabled = 1 * PS_M_Multiplier_ApplyShroud );
-
-#define PS_M_FogEnabled(recolorEnabled) \
-	PS_M_ApplyShroud(false, recolorEnabled), \
-	PS_M_ApplyShroud(true, recolorEnabled)
-
-DEFINE_ARRAY_MULTIPLIER( PS_M_Multiplier_RecolorEnabled = 2 * PS_M_Multiplier_FogEnabled );
+#define PS_Multiplier_RecolorEnabled (2*PS_M_Multiplier_HasShadows)
 
 #define PS_M_RecolorEnabled \
-	PS_M_FogEnabled(false), \
-	PS_M_FogEnabled(true)
+	PS_M_HasShadows(false), \
+	PS_M_HasShadows(true)
 
-DEFINE_ARRAY_MULTIPLIER( PS_M_Multiplier_Final = 2 * PS_M_Multiplier_RecolorEnabled );
+#define PS_M_Multiplier_Final (2*PS_Multiplier_RecolorEnabled)
 
 #if SUPPORTS_SHADER_ARRAYS
 pixelshader PS_M_Array[PS_M_Multiplier_Final] =
@@ -1116,23 +1115,29 @@ float4 PS_L(VSOutput_L In, uniform bool recolorEnabled) : COLOR
 // Low LOD technique. Doesn't do any normal mapping.
 // ----------------------------------------------------------------------------
 
+#define VS_L_Multiplier_Final 2
+
 #define VS_L_NumJointsPerVertex \
 	compile VS_VERSION_LOW VS_L(0), \
 	compile VS_VERSION_LOW VS_L(1)
 
 #if SUPPORTS_SHADER_ARRAYS
-vertexshader VS_L_Array[2] =
+vertexshader VS_L_Array[VS_L_Multiplier_Final] =
 {
 	VS_L_NumJointsPerVertex
 };
 #endif
 
+#define PS_L_Multiplier_RecolorEnabled 1
+
 #define PS_L_RecolorEnabled \
 	compile PS_VERSION_LOW PS_L(0), \
 	compile PS_VERSION_LOW PS_L(1)
 
+#define PS_L_Multiplier_Final (2*PS_L_Multiplier_RecolorEnabled)
+
 #if SUPPORTS_SHADER_ARRAYS
-pixelshader PS_L_Array[2] =
+pixelshader PS_L_Array[PS_L_Multiplier_Final] =
 {
 	PS_L_RecolorEnabled
 };
@@ -1257,23 +1262,30 @@ float4 CreateShadowMapPS_Xenon(VSOutput_CreateShadowMap In) : COLOR
 // ----------------------------------------------------------------------------
 // Technique _CreateShadowMap
 // ----------------------------------------------------------------------------
+
+#define VSCreateShadowMap_Multiplier_Final 2
+
 #define VSCreateShadowMap_NumJointsPerVertex \
 	compile vs_2_0 CreateShadowMapVS(0), \
 	compile vs_2_0 CreateShadowMapVS(1)
 
 #if SUPPORTS_SHADER_ARRAYS
-vertexshader VSCreateShadowMap_Array[2] =
+vertexshader VSCreateShadowMap_Array[VS_L_Multiplier_Final] =
 {
 	VSCreateShadowMap_NumJointsPerVertex
 };
 #endif
 
+#define PSCreateShadowMap_Multiplier_AlphaTestEnable 1
+
 #define PSCreateShadowMap_AlphaTestEnable \
 	compile ps_2_0 CreateShadowMapPS(false), \
 	compile ps_2_0 CreateShadowMapPS(true)
 
+#define PSCreateShadowMap_Multiplier_Final (2*PSCreateShadowMap_Multiplier_AlphaTestEnable)
+
 #if SUPPORTS_SHADER_ARRAYS
-pixelshader PSCreateShadowMap_Array[2] =
+pixelshader PSCreateShadowMap_Array[PSCreateShadowMap_Multiplier_Final] =
 {
 	PSCreateShadowMap_AlphaTestEnable
 };
