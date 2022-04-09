@@ -456,19 +456,17 @@ float Time : Time;
 // ----------------------------------------------------------------------------
 // SHADER: DEFAULT
 // ----------------------------------------------------------------------------
-struct VSOutput {
+struct VSOutput_H {
 
-	float4 Position : POSITION;
-	float4 TexCoord0_TexCoord1 : TEXCOORD0;
-	float4 LightVector[NumDirectionalLightsPerPixel] : TEXCOORD1_centroid;
-	float4 HalfEyeLightVector : TEXCOORD4_centroid;
-	float4 ReflectVector : TEXCOORD5_centroid;
-	float4 ShadowMapTexCoord : TEXCOORD6;
-	float4 Color : COLOR0;
-
-#if defined(SUPPORT_BUILDUP)
-	float2 BuildupWarpTexCoord : TEXCOORD3;
-#endif
+	float4 Position : POSITION; //Correct
+	float4 TexCoord0_TexCoord1 : TEXCOORD0; //Correct
+	float3 LightVector[NumDirectionalLightsPerPixel] : TEXCOORD1_centroid;
+	// float3 TexCoord2 : TEXCOORD2;
+	float3 HalfEyeLightVector : TEXCOORD3_centroid;
+	float3 ReflectVector : TEXCOORD4; //Correct
+	float4 ShadowMapTexCoord : TEXCOORD5; //Correct
+	float4 ShroudTexCoord : TEXCOORD6; //Correct
+	float4 Color : COLOR0; //Correct
 
 #ifdef PER_PIXEL_POINT_LIGHT
 	float3 WorldPosition : TEXCOORD7;
@@ -478,13 +476,14 @@ struct VSOutput {
 // ----------------------------------------------------------------------------
 // SHADER: VS_H
 // ----------------------------------------------------------------------------
-VSOutput VS_H(VSInputSkinningOneBoneTangentFrame InSkin, 
+VSOutput_H VS_H(VSInputSkinningOneBoneTangentFrame InSkin, 
 		float2 TexCoord : TEXCOORD0,
+		float4 VertexColor : COLOR0,
 		uniform int numJointsPerVertex)
 {
 	USE_DIRECTIONAL_LIGHT_INTERACTIVE(DirectionalLight, 0);
 
-	VSOutput Out;
+	VSOutput_H Out;
 
 	float3 worldPosition = 0;
 	float3 worldNormal = 0;
@@ -498,7 +497,7 @@ VSOutput VS_H(VSInputSkinningOneBoneTangentFrame InSkin,
 	Out.Position = mul(float4(worldPosition, 1), GetViewProjection());
 	
 	// Compute view direction in world space
-	float3 worldEyeDir = normalize(ViewI[3] - worldPosition);
+	float3 worldEyeDir = normalize(EyePosition - worldPosition);
 
 	// Build 3x3 tranform from object to tangent space
 	float3x3 worldToTangentSpace = transpose(float3x3(-worldBinormal, -worldTangent, worldNormal));
@@ -506,15 +505,12 @@ VSOutput VS_H(VSInputSkinningOneBoneTangentFrame InSkin,
 	for (int i = 0; i < NumDirectionalLightsPerPixel; i++)
 	{
 		// Compute lighting direction in tangent space
-		Out.LightVector[i] = float4(mul(DirectionalLight[i].Direction, worldToTangentSpace), 0);
+		Out.LightVector[i] = float3(mul(DirectionalLight[i].Direction, worldToTangentSpace));
 	}
 
 	// Compute half direction between view and light direction in tangent space
-	Out.HalfEyeLightVector.xyz = normalize(mul(DirectionalLight[0].Direction + worldEyeDir, worldToTangentSpace));
-	Out.ReflectVector.xyz = worldEyeDir;
-
-	Out.Color = float4(AmbientLightColor * AmbientColor, OpacityOverride);
-
+	Out.HalfEyeLightVector = normalize(mul(DirectionalLight[0].Direction + worldEyeDir, worldToTangentSpace));
+	Out.ReflectVector = worldPosition;
 
 	// Compute remaining directional lights per vertex, others will be done in pixel shader
 	float3 diffuseLight = 0;
@@ -523,132 +519,91 @@ VSOutput VS_H(VSInputSkinningOneBoneTangentFrame InSkin,
 		diffuseLight += DirectionalLight[i].Color * max(0, dot(worldNormal, DirectionalLight[i].Direction));
 	}
 
-#if defined(SUPPORT_POINT_LIGHTS)
-	// Compute point lights
-	for (int i = 0; i < NumPointLights; i++)
-	{
-		float3 direction = PointLight[i].Position - worldPosition;
-		float lightDistance = length(direction);
-		direction /= lightDistance;
-		
-		float attenuation = CalculatePointLightAttenuation(PointLight[i], lightDistance);
-		
-		diffuseLight += PointLight[i].Color * attenuation * max(0, dot(worldNormal, direction));
-	}
-#endif
-
+	Out.Color = float4(AmbientLightColor * AmbientColor, OpacityOverride);
 	Out.Color.xyz += diffuseLight * DiffuseColor;
-
-	Out.Color /= 2; // Prevent clamping in interpolator
-
+	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex).w;
+	Out.Color *= VertexColor;
 	// pass texture coordinates for fetching the diffuse and normal maps
-	Out.TexCoord0_TexCoord1.xy = TexCoord.xy;
-
-	// Hack cloud tex coord into final components of light vectors
-	float2 cloudTexCoord = CalculateCloudTexCoord(Cloud, worldPosition, Time);
-	Out.LightVector[0].w = cloudTexCoord.x;
-	Out.LightVector[1].w = cloudTexCoord.y;
-
-	float2 texCoord1 = TexCoord;
-
-	Out.TexCoord0_TexCoord1.zw = texCoord1.yx;
-	
+	Out.TexCoord0_TexCoord1.xyzw = TexCoord.xyyx;
 	Out.ShadowMapTexCoord = CalculateShadowMapTexCoord(ShadowInfo, worldPosition);
+	Out.ShroudTexCoord.xy = CalculateShroudTexCoord(Shroud, worldPosition);
+	Out.ShroudTexCoord.zw = CalculateCloudTexCoord(Cloud, worldPosition, Time);
 	
-	float2 shroudTexCoord = CalculateShroudTexCoord(Shroud, worldPosition);
-	Out.HalfEyeLightVector.w = shroudTexCoord.x;
-	Out.ReflectVector.w = shroudTexCoord.y;
-	
-	// Calculate fog
-	// Out.Fog = CalculateFog(Fog, worldPosition, ViewI[3]);
-
 	return Out;
 }
 
 // ----------------------------------------------------------------------------
 // SHADER: VS_Xenon
 // ----------------------------------------------------------------------------
-VSOutput VS_Xenon(VSInputSkinningOneBoneTangentFrame InSkin, 
-		float2 TexCoord : TEXCOORD0
-#if defined(SUPPORT_BUILDUP)
-		, float2 BuildupTexCoord : TEXCOORD1
-#endif
+VSOutput_H VS_Xenon(VSInputSkinningOneBoneTangentFrame InSkin, 
+		float2 TexCoord : TEXCOORD0,
+		float4 VertexColor : COLOR
 		)
 {
 	return VS_H( InSkin,
 		TexCoord,
-#if defined(SUPPORT_BUILDUP)
-		BuildupTexCoord,
-#endif
+		VertexColor,
 		min(NumJointsPerVertex, 1) );
 }
 
 // ----------------------------------------------------------------------------
 // SHADER: PS_H
 // ----------------------------------------------------------------------------
-float4 PS_H(VSOutput In, uniform int HasShadow, uniform bool applyShroud,
+float4 PS_H(VSOutput_H In, uniform int HasShadow, uniform bool applyShroud,
 	uniform bool fogEnabled, uniform bool recolorEnabled) : COLOR
 {
 	float2 texCoord0 = In.TexCoord0_TexCoord1.xy;
 	float2 texCoord1 = In.TexCoord0_TexCoord1.wz;
-	float2 cloudTexCoord = float2(In.LightVector[0].w, In.LightVector[1].w);
 
 	// Get diffuse color
-	float4 baseTexture = tex2D( SAMPLER(DiffuseTexture), texCoord0);
+	float4 baseTexture = tex2D( SAMPLER(DiffuseTexture), texCoord0);	
+
+	baseTexture.xyz = exp2(log2(baseTexture.xyz) * 2.2);
+	
+#if defined(SUPPORT_SPECMAP)
+	// Read spec map
+	float4 specTexture = tex2D( SAMPLER(SpecMap), texCoord0);
+	float specularStrength = specTexture.x;  // Specular lighting mask
+	float reflectionStrength = specTexture.y; // Reflection/env map mask
+#if defined(SUPPORT_RECOLORING)
+	if (recolorEnabled)
+	{
+		float HouseColorStrength = specTexture.z;
+		baseTexture.xyz += HouseColorStrength * (baseTexture.xyz * RecolorColor * 2 - baseTexture.xyz);
+	}
+#endif //defined(SUPPORT_RECOLORING)
+#endif // SUPPORT_SPECMAP
+	
 	float3 diffuse = baseTexture.xyz * DiffuseColor;
-
-
-#if defined(OBJECTS_ALIEN)
-	float time = Time * 0.2;
-#endif
 
 	// Get bump map normal
 	float3 bumpNormal = (float3)tex2D( SAMPLER(NormalMap), texCoord0) * 2.0 - 1.0;
 
 	// Scale normal to increase/decrease bump effect
 	bumpNormal.xy *= BumpScale;
+	bumpNormal = float3(dot(bumpNormal.xyz, In.LightVector[0]), dot(bumpNormal.xyz, In.LightVector[1]), dot(bumpNormal.xyz, In.HalfEyeLightVector));
 	bumpNormal = normalize(bumpNormal);
 	
-	float4 color = In.Color * baseTexture * 2;
+	float4 color;
+	color.xyz = In.Color.xyz * baseTexture.xyz;
 
 	float3 specularColor = SpecularColor;
 
 #if defined(SUPPORT_SPECMAP)
-	// Read spec map
-	float4 specTexture = tex2D( SAMPLER(SpecMap), texCoord0);
-	float specularStrength = specTexture.x;  // Specular lighting mask
-	float reflectionStrength = specTexture.y; // Reflection/env map mask
-	float selfIlluminationStrength = specTexture.z; 
-
-#if defined(OBJECTS_ALIEN)
 	// Envmap calculations
-	float3 Nn = normalize(worldNormal + bumpNormal);
-	float3 Vn = /*normalize*/(In.ReflectVector);
+	float3 Nn = bumpNormal;
+	float3 Vn = normalize(EyePosition.xyz - In.ReflectVector);
 	float3 reflVect = -reflect(Vn,Nn);
-	float3 envcolor = tex2D( SAMPLER(EnvironmentTexture), reflVect.y + time);
-
-#if defined(SUPPORT_IONHULL)
-	envcolor *= reflectionStrength * SpecularColor * 12;
-#else
-	envcolor *= EnvMult * reflectionStrength * SpecularColor * 6;
-
-	specularColor = 3.0 * SpecularColor * specularStrength;
-#endif // ION_HULL
-
-#else // !OBJECTS_ALIEN
-	// Envmap calculations
-	float3 Nn = normalize(bumpNormal * 0.5);
-	float3 Vn = /*normalize*/(In.ReflectVector);
-	float3 reflVect = -reflect(Vn,Nn);
-	float3 envcolor = EnvMult * texCUBE( SAMPLER(EnvironmentTexture), reflVect).xyz;
+	float3 envcolor = texCUBE( SAMPLER(EnvironmentTexture), reflVect).xyz;
 	
-	color.xyz += envcolor * reflectionStrength * SpecularColor;
-
-	specularColor = 3.0 * SpecularColor * specularStrength;
-#endif // !OBJECTS_ALIEN
+	// specularColor = SpecularColor * specularStrength;
 
 #endif // SUPPORT_SPECMAP
 
+	float2 cloudTexCoord = In.ShroudTexCoord.zw;
+	
+	color.xyz += DirectionalLight[0].Color * envcolor * specularStrength;
+	
 	for (int i = 0; i < NumDirectionalLightsPerPixel; i++)
 	{
 		// Compute lighting
@@ -659,10 +614,12 @@ float4 PS_H(VSOutput In, uniform int HasShadow, uniform bool applyShroud,
         float4 specularTerm = dot( bumpNormal, halfVec );
 
 		float4 lighting = lit( diffuseTerm, specularTerm, SpecularExponent );
-			
+		
+		float directionlight = max(dot(DirectionalLight[i].Direction, bumpNormal), 0);
+		
 		if (i == 0)
 		{
-			if (HasShadow >= 1)
+			if (HasShadow)
 			{
 				lighting.yz *= shadow( SAMPLER(ShadowMap), In.ShadowMapTexCoord, ShadowInfo);
 			}
@@ -670,69 +627,40 @@ float4 PS_H(VSOutput In, uniform int HasShadow, uniform bool applyShroud,
 			float3 cloud = float3(1, 1, 1);			
 #if defined(_WW3D_) && !defined(_W3DVIEW_)
 			cloud = tex2D( SAMPLER(CloudTexture), cloudTexCoord);
+			cloud.xyz = exp2(log2(cloud.xyz) * 2.2);
 #endif
 
-			color.xyz += DirectionalLight[0].Color * cloud
-#if defined(OBJECTS_ALIEN)
-				* envcolor
-#endif
-				* (diffuse * lighting.y + specularColor * lighting.z);
+			color.xyz += DirectionalLight[0].Color * cloud * diffuse * directionlight;
 		}
 		else 
 		{
-	    	color.xyz += DirectionalLight[i].Color * (diffuse * lighting.y);
+			
+	    	color.xyz += DirectionalLight[i].Color * diffuse * directionlight;
 		}
 	}
 
-#if defined(SUPPORT_IONHULL)
-	float3 ionTexture1 = tex2D( SAMPLER(IonHullTexture), texCoord0 + time);
-	float3 ionTexture2 = tex2D( SAMPLER(IonHullTexture), (texCoord0 * 2) + time);
-	color.xyz += ionTexture1.xyz * ionTexture2.xyz * 3;
-#endif
-	
-#if defined(SCROLL_HOUSECOLOR)
-	float4 scrollTexture = tex2D( SAMPLER(ScrollingMaskTexture), texCoord1);
-	selfIlluminationStrength *= scrollTexture.x;
-
-	color.xyz += selfIlluminationStrength * RecolorColor * RecolorMultiplier * recolorEnabled;
-#else // defined(SCROLL_HOUSECOLOR)
-
-#if defined(SUPPORT_SPECMAP) && !defined(OBJECTS_ALIEN)
-	color.xyz = lerp(color, baseTexture, selfIlluminationStrength);
-#endif
-
-#if defined(SUPPORT_RECOLORING)
-	if (recolorEnabled)
+#if defined(SUPPORT_POINT_LIGHTS)
+	// Compute point lights
+	float3 temp;
+	for (int i = 0; i < NumPointLights; i++)
 	{
-		// float4 recolorColor = tex2D( SAMPLER(RecolorTexture), texCoord0);
-		// recolorColor.xyz *= RecolorColor;
-#if defined(OBJECTS_ALIEN)
-		color.xyz += selfIlluminationStrength * RecolorColor * alienPulse;
-#else
-		color.xyz = lerp(color.xyz, RecolorColor, selfIlluminationStrength);
-#endif
+		float3 direction = PointLight[i].Position - In.ReflectVector;
+		float lightDistance = length(direction);
+		direction /= lightDistance;
+		
+		float attenuation = CalculatePointLightAttenuation(PointLight[i], lightDistance);
+		
+		// diffuseLight += PointLight[i].Color * attenuation * max(0, dot(worldNormal, direction));
+		temp.xyz += PointLight[i].Color * attenuation * direction;
 	}
-#endif //defined(SUPPORT_RECOLORING)
-#endif // defined(SCROLL_HOUSECOLOR)
-
-#if defined(SUPPORT_BUILDUP)
-	float3 warpTexture = tex2D( SAMPLER(BuildUpMap), In.BuildupWarpTexCoord);
-	float fadeTexture = tex2D( SAMPLER(BuildUpMap), texCoord1).w;
-	float alphaThreshold = fadeTexture * OpacityOverride;
-
-	color.xyz += (alphaThreshold <= 0.25) * warpTexture;
-	clip(alphaThreshold - 0.21);
+	color.xyz += temp * diffuse;
 #endif
 
-	if (fogEnabled)
-	{
-		// color.xyz = lerp(Fog.Color, color.xyz, In.Fog);
-	}
+	color.xyz *= TintColor;
 
-	if (applyShroud)
-	{
-		color.xyz *= tex2D( SAMPLER(ShroudTexture), float2( In.HalfEyeLightVector.w, In.ReflectVector.w ) );
-	}
+	color.w = baseTexture.w * In.Color.w;
+
+	color.xyz *= tex2D( SAMPLER(ShroudTexture), In.ShroudTexCoord.xy );
 
 	return color;
 }
@@ -741,7 +669,7 @@ float4 PS_H(VSOutput In, uniform int HasShadow, uniform bool applyShroud,
 // ----------------------------------------------------------------------------
 // SHADER: PS_Xenon
 // ----------------------------------------------------------------------------
-float4 PS_Xenon( VSOutput In ) : COLOR
+float4 PS_Xenon( VSOutput_H In ) : COLOR
 {
 	return PS_H( In, min(HasShadow, 1), (ObjectShroudStatus == OBJECTSHROUD_PARTIAL_CLEAR), 0, (HasRecolorColors > 0) );
 }
@@ -765,8 +693,8 @@ vertexshader VS_H_Array[VS_Multiplier_Final] =
 DEFINE_ARRAY_MULTIPLIER( PS_Multiplier_NumShadows = 1 );
 
 #define PS_NumShadows(recolorEnabled) \
-	compile ps_3_0 PS_H(0, false, false, recolorEnabled), \
-	compile ps_3_0 PS_H(1, false, false, recolorEnabled)
+	compile ps_3_0 PS_H(false, false, false, recolorEnabled), \
+	compile ps_3_0 PS_H(true, false, false, recolorEnabled)
 
 DEFINE_ARRAY_MULTIPLIER( PS_Multiplier_RecolorEnabled = PS_Multiplier_NumShadows * 2 );
 	
@@ -918,7 +846,7 @@ float4 PS_M(VSOutput_M In, uniform bool HasShadow, uniform bool recolorEnabled) 
 	specularColor *= specularStrength;
 #endif
 
-	color.xyz = baseTexture * In.Color.xyz;
+	color.xyz = baseTexture.xyz * In.Color.xyz;
 
 	float3 diffuse = baseTexture.xyz * DiffuseColor;
 
@@ -1192,9 +1120,6 @@ struct VSOutput_CreateShadowMap
 {
 	float4 Position : POSITION;
 	float2 TexCoord0 : TEXCOORD0;
-#if defined(SUPPORT_BUILDUP)
-	float2 TexCoord1 : TEXCOORD2;
-#endif
 	float Depth : TEXCOORD1;
 	float Color : COLOR;
 };
