@@ -26,7 +26,11 @@
 	< \
 		annotations \
 	>; \
-	sampler2D samplerName##Sampler = sampler_state \
+	sampler2D samplerName##Sampler \
+	< \
+		string Texture = ("%s", #samplerName); \
+		annotations \
+	> = sampler_state \
 	{ \
 		Texture = < samplerName >;
 		
@@ -39,7 +43,11 @@
 	< \
 		annotations \
 	>; \
-	samplerCUBE samplerName##Sampler = sampler_state \
+	samplerCUBE samplerName##Sampler \
+	< \
+		string Texture = ("%s", #samplerName); \
+		annotations \
+	> = sampler_state \
 	{ \
 		Texture = < samplerName >;
 		
@@ -135,10 +143,20 @@ float3 RecolorColor
 
 #else // defined(SUPPORT_RECOLORING)
 
-static const bool HasRecolorColors = 0;
+static const bool HasRecolorColors = false;
 static const float3 RecolorColor = float3(0, 0, 0);
 
+float3 RecolorColorDummy
+<
+	bool unmanaged = 1;
+>;
+
 #endif // defined(SUPPORT_RECOLORING)
+
+float4x4 ShadowMapWorldToShadow
+<
+	bool unmanaged = 1;
+>;
 
 float OpacityOverride
 <
@@ -147,27 +165,22 @@ float OpacityOverride
 
 float3 TintColor
 <
-	string UIName = "Tint Color"; 
-    string UIWidget = "Color";
+	bool unmanaged = 1;
 > = float3(1, 1, 1);
 
 float3 EyePosition
 <
-	string UIName = "Tint Color"; 
-    string UIWidget = "Color";
+	bool unmanaged = 1;
 >;
 
 // ----------------------------------------------------------------------------
 // Transformations (world transformations are in skinning header)
 // ----------------------------------------------------------------------------
-float4x4 View : View;
-float4x3 ViewI : ViewInverse;
 
 #if defined(_WW3D_)
 float4x4 ViewProjection
 <
-	string UIWidget = "None";
-	string SasBindAddress = "Sas.Camera.WorldToProjection";
+	bool unmanaged = 1;
 >;
 
 float4x4 GetViewProjection()
@@ -175,6 +188,9 @@ float4x4 GetViewProjection()
 	return ViewProjection;
 }
 #else
+float4x4 View : View;
+float4x3 ViewI : ViewInverse;
+
 float4x4 Projection : Projection;
 
 float4x4 GetViewProjection()
@@ -183,38 +199,31 @@ float4x4 GetViewProjection()
 }
 #endif
 
-//---
+// ----------------------------------------------------------------------------
+// Skinning
+// ----------------------------------------------------------------------------
+static const int MaxSkinningBonesPerVertex = 1;
 
-// float4 WorldBones[128]
-// <
-// 	bool unmanaged = 1;
-// >;
+#include "Skinning.fxh"
 
 // ----------------------------------------------------------------------------
 // Shadow mapping
 // ----------------------------------------------------------------------------
-int HasShadow
+bool HasShadow
 <
 	string UIWidget = "None";
 	string SasBindAddress = "Sas.HasShadow";
 >;
 
-// DELETE THIS
-ShadowSetup ShadowInfo
-<
-	string UIWidget = "None";
-	string SasBindAddress = "Sas.Shadow[0]";
->;
-
 SAMPLER_2D_SHADOW( ShadowMap )
-
-// ----------------
 
 float4 Shadowmap_Zero_Zero_OneOverMapSize_OneOverMapSize
 <
 	string UIWidget = "None";
 	string SasBindAddress = "Sas.Shadow[0].Zero_Zero_OneOverMapSize_OneOverMapSize";
 >;
+
+// ----------------
 
 float2 MapCellSize
 <
@@ -223,7 +232,6 @@ float2 MapCellSize
 > = float2(10, 10);
 
 SAMPLER_2D_BEGIN( MacroSampler,
-	string Texture = "MacroSampler";
 	string UIWidget = "None";
 	string SasBindAddress = "Terrain.MacroTexture";
 	string ResourceName = "ShaderPreviewMacro.dds";
@@ -243,14 +251,23 @@ int _SasGlobal : SasGlobal
 	int MaxSupportedInstancingMode = 1;
 >;
 
-// ----------------------------------------------------------------------------
-// Skinning
-// ----------------------------------------------------------------------------
-static const int MaxSkinningBonesPerVertex = 1;
-
-#include "Skinning.fxh"
-
 // MAPS
+
+//
+// Global uploaded constants
+//
+
+int NumJointsPerVertex
+<
+	string UIWidget = "None";
+	string SasBindAddress = "Sas.Skeleton.NumJointsPerVertex";
+> = 0;
+
+#if defined(USE_NON_SKINNING_WORLD_MATRIX)
+
+float4x3 World : World;
+
+#endif
 
 SAMPLER_2D_BEGIN( CloudTexture,
 	string UIWidget = "None";
@@ -280,7 +297,6 @@ SAMPLER_CUBE_BEGIN( EnvironmentTexture,
 SAMPLER_CUBE_END
 #else
 SAMPLER_CUBE_BEGIN( EnvironmentTexture,
-	string Texture = "EnvironmentTexture";
 	string UIWidget = "None";
 	string SasBindAddress = "Objects.LightSpaceEnvironmentMap";
 	string ResourceType = "Cube";
@@ -298,7 +314,6 @@ SAMPLER_CUBE_END
 // Editable parameters
 // ----------------------------------------------------------------------------
 SAMPLER_2D_BEGIN( DiffuseTexture,
-	string Texture = "DiffuseTexture";
 	string UIName = "Diffuse Texture";
 	)
 	MinFilter = MinFilterBest;
@@ -310,7 +325,6 @@ SAMPLER_2D_BEGIN( DiffuseTexture,
 SAMPLER_2D_END
 
 SAMPLER_2D_BEGIN( NormalMap,
-	string Texture = "NormalMap";
 	string UIName = "Normal Texture";
 	)
 	MinFilter = MinFilterBest;
@@ -323,7 +337,6 @@ SAMPLER_2D_END
 
 #if defined(SUPPORT_SPECMAP)
 SAMPLER_2D_BEGIN( SpecMap,
-	string Texture = "SpecMap";
 	string UIName = "Specular Map";
 	)
 	MinFilter = MinFilterBest;
@@ -429,13 +442,6 @@ ShroudSetup Shroud
 	string SasBindAddress = "Terrain.Shroud";
 > = DEFAULT_SHROUD;
 
-// DELETE THIS
-int ObjectShroudStatus
-<
-	string UIWidget = "None";
-	string SasBindAddress = "Terrain.Shroud.ObjectShroudStatus";
-> = OBJECTSHROUD_INVALID;
-
 SAMPLER_2D_BEGIN( ShroudTexture,
 	string UIWidget = "None";
 	string SasBindAddress = "Terrain.Shroud.Texture";
@@ -490,7 +496,7 @@ VSOutput_H VS_H(VSInputSkinningOneBoneTangentFrame InSkin,
 	float3 worldTangent = 0;
 	float3 worldBinormal = 0;
 
-	CalculatePositionAndTangentFrame(InSkin, numJointsPerVertex,
+	CalculatePositionAndTangentFrame(InSkin, numJointsPerVertex, World,
 		worldPosition, worldNormal, worldTangent, worldBinormal);
 	
 	// transform position to projection space
@@ -521,11 +527,11 @@ VSOutput_H VS_H(VSInputSkinningOneBoneTangentFrame InSkin,
 
 	Out.Color = float4(AmbientLightColor * AmbientColor, OpacityOverride);
 	Out.Color.xyz += diffuseLight * DiffuseColor;
-	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex).w;
+	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex, World).w;
 	Out.Color *= VertexColor;
 	// pass texture coordinates for fetching the diffuse and normal maps
 	Out.TexCoord0_TexCoord1.xyzw = TexCoord.xyyx;
-	Out.ShadowMapTexCoord = CalculateShadowMapTexCoord(ShadowInfo, worldPosition);
+	Out.ShadowMapTexCoord = CalculateShadowMapTexCoord(ShadowMapWorldToShadow, worldPosition);
 	Out.ShroudTexCoord.xy = CalculateShroudTexCoord(Shroud, worldPosition);
 	Out.ShroudTexCoord.zw = CalculateCloudTexCoord(Cloud, worldPosition, Time);
 	
@@ -621,7 +627,7 @@ float4 PS_H(VSOutput_H In, uniform int HasShadow, uniform bool applyShroud,
 		{
 			if (HasShadow)
 			{
-				lighting.yz *= shadow( SAMPLER(ShadowMap), In.ShadowMapTexCoord, ShadowInfo);
+				lighting.yz *= shadow( SAMPLER(ShadowMap), In.ShadowMapTexCoord, Shadowmap_Zero_Zero_OneOverMapSize_OneOverMapSize);
 			}
 			
 			float3 cloud = float3(1, 1, 1);			
@@ -656,9 +662,9 @@ float4 PS_H(VSOutput_H In, uniform int HasShadow, uniform bool applyShroud,
 	color.xyz += temp * diffuse;
 #endif
 
-	color.xyz *= TintColor;
-
 	color.w = baseTexture.w * In.Color.w;
+
+	color.xyz *= TintColor;
 
 	color.xyz *= tex2D( SAMPLER(ShroudTexture), In.ShroudTexCoord.xy );
 
@@ -671,7 +677,7 @@ float4 PS_H(VSOutput_H In, uniform int HasShadow, uniform bool applyShroud,
 // ----------------------------------------------------------------------------
 float4 PS_Xenon( VSOutput_H In ) : COLOR
 {
-	return PS_H( In, min(HasShadow, 1), (ObjectShroudStatus == OBJECTSHROUD_PARTIAL_CLEAR), 0, (HasRecolorColors > 0) );
+	return PS_H( In, min(HasShadow, 1), 0, 0, (HasRecolorColors > 0) );
 }
 
 // ----------------------------------------------------------------------------
@@ -690,13 +696,13 @@ vertexshader VS_H_Array[VS_Multiplier_Final] =
 };
 #endif
 
-DEFINE_ARRAY_MULTIPLIER( PS_Multiplier_NumShadows = 1 );
+DEFINE_ARRAY_MULTIPLIER( PS_Multiplier_HasShadow = 1 );
 
 #define PS_NumShadows(recolorEnabled) \
 	compile ps_3_0 PS_H(false, false, false, recolorEnabled), \
 	compile ps_3_0 PS_H(true, false, false, recolorEnabled)
 
-DEFINE_ARRAY_MULTIPLIER( PS_Multiplier_RecolorEnabled = PS_Multiplier_NumShadows * 2 );
+DEFINE_ARRAY_MULTIPLIER( PS_Multiplier_RecolorEnabled = PS_Multiplier_HasShadow * 2 );
 	
 #define PS_RecolorEnabled \
 	PS_NumShadows(false), \
@@ -715,23 +721,15 @@ pixelshader PS_H_Array[PS_Multiplier_Final] =
 // Technique: Default
 // ----------------------------------------------------------------------------
 technique Default
-<
-	int MaxSkinningBones = MaxSkinningBones;
->
 {
 	pass p0
 	<
 		USE_EXPRESSION_EVALUATOR("Objects")
 	>
 	{
-		VertexShader = ARRAY_EXPRESSION_VS( VS_H_Array,
-			min(NumJointsPerVertex, 1), 
-			compile VS_VERSION VS_Xenon() );
-
-		PixelShader = ARRAY_EXPRESSION_PS( PS_H_Array,
-			min(HasShadow, 1) * PS_Multiplier_NumShadows
-			+ (HasRecolorColors > 0) * PS_Multiplier_RecolorEnabled,
-			compile PS_VERSION PS_Xenon() );
+		VertexShader = VS_H_Array[min(NumJointsPerVertex, 1)];
+			
+		PixelShader = PS_H_Array[HasRecolorColors * PS_Multiplier_RecolorEnabled + HasShadow * PS_Multiplier_HasShadow];
 
 		ZEnable = true;
 		ZFunc = ZFUNC_INFRONT;
@@ -782,7 +780,7 @@ VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 	float3 worldTangent = 0;
 	float3 worldBinormal = 0;
 
-	CalculatePositionAndTangentFrame(InSkin, numJointsPerVertex, worldPosition, worldNormal, worldTangent, worldBinormal);
+	CalculatePositionAndTangentFrame(InSkin, numJointsPerVertex, World, worldPosition, worldNormal, worldTangent, worldBinormal);
 
 	// transform position to projection space
 	Out.Position = mul(float4(worldPosition, 1), GetViewProjection());
@@ -807,13 +805,13 @@ VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 	}
 
 	Out.Color.xyz = AmbientLightColor * AmbientColor + diffuseLight * DiffuseColor;
-	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex).w;
+	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex, World).w;
 	Out.Color.w = OpacityOverride;
 	Out.Color *= VertexColor;
 	Out.TexCoord0 = TexCoord.xyyx;
 	Out.ShroudTexCoord.xy = CalculateShroudTexCoord(Shroud, worldPosition);
 	Out.ShroudTexCoord.zw = CalculateCloudTexCoord(Cloud, worldPosition, Time);
-	Out.ShadowMapTexCoord = CalculateShadowMapTexCoord(ShadowInfo, worldPosition);
+	Out.ShadowMapTexCoord = CalculateShadowMapTexCoord(ShadowMapWorldToShadow, worldPosition);
 	Out.MapCellTexCoord = float2(1, -1) * (worldPosition.xy / (MapCellSize.x * 66));
 	
 	return Out;
@@ -868,7 +866,7 @@ float4 PS_M(VSOutput_M In, uniform bool HasShadow, uniform bool recolorEnabled) 
 
 	if (HasShadow)
 	{
-		lighting.yz *= shadow( SAMPLER(ShadowMap), In.ShadowMapTexCoord, ShadowInfo);
+		lighting.yz *= shadow( SAMPLER(ShadowMap), In.ShadowMapTexCoord, Shadowmap_Zero_Zero_OneOverMapSize_OneOverMapSize);
 	}
 	
 	// Sample cloud texture
@@ -902,19 +900,19 @@ vertexshader VS_M_Array[VS_M_Multiplier_Final] =
 };
 #endif
 
-#define PS_M_Multiplier_HasShadows 1
+#define PS_M_Multiplier_HasShadow 1
 
 #define PS_M_HasShadows(recolorEnabled) \
 	compile PS_VERSION_HIGH PS_M(false, recolorEnabled), \
 	compile PS_VERSION_HIGH PS_M(true, recolorEnabled)
 
-#define PS_Multiplier_RecolorEnabled (2*PS_M_Multiplier_HasShadows)
+#define PS_M_Multiplier_RecolorEnabled (2*PS_M_Multiplier_HasShadow)
 
 #define PS_M_RecolorEnabled \
 	PS_M_HasShadows(false), \
 	PS_M_HasShadows(true)
 
-#define PS_M_Multiplier_Final (2*PS_Multiplier_RecolorEnabled)
+#define PS_M_Multiplier_Final (2*PS_M_Multiplier_RecolorEnabled)
 
 #if SUPPORTS_SHADER_ARRAYS
 pixelshader PS_M_Array[PS_M_Multiplier_Final] =
@@ -927,25 +925,16 @@ pixelshader PS_M_Array[PS_M_Multiplier_Final] =
 // ----------------------------------------------------------------------------
 // Technique: Default_M
 // ----------------------------------------------------------------------------
-technique _Default_M
-<
-	int MaxSkinningBones = MaxSkinningBones;
->
+technique Default_M
 {
 	pass p0
 	<
 		USE_EXPRESSION_EVALUATOR("Objects")
 	>
 	{
-		VertexShader = ARRAY_EXPRESSION_VS( VS_M_Array,
-			min(NumJointsPerVertex, 1),
-			NO_ARRAY_ALTERNATIVE);
+		VertexShader = VS_M_Array[min(NumJointsPerVertex, 1)];
 			
-		PixelShader = ARRAY_EXPRESSION_PS( PS_M_Array,
-			(ObjectShroudStatus == OBJECTSHROUD_PARTIAL_CLEAR) * PS_M_Multiplier_ApplyShroud
-			+ Fog.IsEnabled * PS_M_Multiplier_FogEnabled
-			+ (HasRecolorColors > 0) * PS_M_Multiplier_RecolorEnabled,
-			NO_ARRAY_ALTERNATIVE);
+		PixelShader = PS_M_Array[HasRecolorColors * PS_M_Multiplier_RecolorEnabled + HasShadow * PS_M_Multiplier_HasShadow];
 
 		ZEnable = true;
 		ZFunc = ZFUNC_INFRONT;
@@ -989,7 +978,7 @@ VSOutput_L VS_L(VSInputSkinningOneBoneTangentFrame InSkin, float2 TexCoord : TEX
 	float3 worldTangent = 0;
 	float3 worldBinormal = 0;
 
-	CalculatePositionAndTangentFrame_L(InSkin, numJointsPerVertex, worldPosition, worldNormal, worldTangent, worldBinormal);
+	CalculatePositionAndTangentFrame(InSkin, numJointsPerVertex, World, worldPosition, worldNormal, worldTangent, worldBinormal);
 
 	// transform position to projection space
 	Out.Position = mul(float4(worldPosition, 1), GetViewProjection());
@@ -1004,7 +993,7 @@ VSOutput_L VS_L(VSInputSkinningOneBoneTangentFrame InSkin, float2 TexCoord : TEX
 	}
 	
 	Out.Color_Opacity.xyz = AmbientLightColor * AmbientColor + diffuseLight * DiffuseColor;
-	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex).w;
+	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex, World).w;
 	Out.Color_Opacity.w = OpacityOverride;
 	Out.Color_Opacity *= VertexColor;
 	Out.BaseTexCoord = TexCoord.xyyx;
@@ -1073,24 +1062,16 @@ pixelshader PS_L_Array[PS_L_Multiplier_Final] =
 
 
 // ----------------------------------------------------------------------------
-technique _Default_L
-<
-	int MaxSkinningBones = MaxSkinningBones_L;
->
+technique Default_L
 {
 	pass p0
 	<
 		USE_EXPRESSION_EVALUATOR("Objects")
 	>
 	{
-		VertexShader = ARRAY_EXPRESSION_VS( VS_L_Array,
-			min(NumJointsPerVertex, 1),
-			NO_ARRAY_ALTERNATIVE );
+		VertexShader = VS_L_Array[min(NumJointsPerVertex, 1)];
 			
-		PixelShader = ARRAY_EXPRESSION_PS( PS_L_Array,
-			(ObjectShroudStatus == OBJECTSHROUD_PARTIAL_CLEAR) * PS_L_Multiplier_ApplyShroud
-			+ (HasRecolorColors > 0) * PS_L_Multiplier_RecolorEnabled,
-			NO_ARRAY_ALTERNATIVE );
+		PixelShader = PS_L_Array[HasRecolorColors * PS_L_Multiplier_RecolorEnabled];
 			
 		ZEnable = true;
 		ZFunc = ZFUNC_INFRONT;
@@ -1137,7 +1118,7 @@ VSOutput_CreateShadowMap CreateShadowMapVS(VSInputSkinningOneBoneTangentFrame In
 	float3 worldTangent = 0;
 	float3 worldBinormal = 0;
 
-	CalculatePositionAndTangentFrame(InSkin, numJointsPerVertex,
+	CalculatePositionAndTangentFrame(InSkin, numJointsPerVertex, World,
 		worldPosition, worldNormal, worldTangent, worldBinormal);
 
 	// Transform position to projection space
@@ -1145,7 +1126,7 @@ VSOutput_CreateShadowMap CreateShadowMapVS(VSInputSkinningOneBoneTangentFrame In
 	Out.Depth = Out.Position.z / Out.Position.w;	
 	Out.TexCoord0 = TexCoord;	
 
-	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex).w;
+	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex, World).w;
 	Out.Color = VertexColor.w * OpacityOverride;
 
 	return Out;
@@ -1220,17 +1201,10 @@ pixelshader PSCreateShadowMap_Array[PSCreateShadowMap_Multiplier_Final] =
 technique _CreateShadowMap
 {
 	pass p0
-	<
-		USE_EXPRESSION_EVALUATOR("Objects_CreateShadowMap")
-	>
 	{
-		VertexShader = ARRAY_EXPRESSION_VS( VSCreateShadowMap_Array,
-			min(NumJointsPerVertex, 1),
-			compile VS_VERSION CreateShadowMapVS_Xenon() );
+		VertexShader = VSCreateShadowMap_Array[min(NumJointsPerVertex, 1)];
 			
-		PixelShader = ARRAY_EXPRESSION_PS( PSCreateShadowMap_Array,
-			AlphaTestEnable,
-			compile PS_VERSION CreateShadowMapPS_Xenon() );
+		PixelShader = PSCreateShadowMap_Array[AlphaTestEnable];
 
 		ZEnable = true;
 		ZFunc = ZFUNC_INFRONT;

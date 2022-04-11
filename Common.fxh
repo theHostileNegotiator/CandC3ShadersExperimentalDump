@@ -70,8 +70,8 @@
 	// The non-"direct" version of the macro use the expression evaluator to evaluate the array index when possible.
 	#if EXPRESSION_EVALUATOR_ENABLED
 	
-		int _ArrayIndexVS = 0;
-		int _ArrayIndexPS = 0;
+		// int _ArrayIndexVS = 0;
+		// int _ArrayIndexPS = 0;
 		#define ARRAY_EXPRESSION_VS(arrayName, expression, noArraySupportAlternative) ( arrayName[ _ArrayIndexVS ] )
 		#define ARRAY_EXPRESSION_PS(arrayName, expression, noArraySupportAlternative) ( arrayName[ _ArrayIndexPS ] )
 
@@ -246,19 +246,17 @@ float2 CalculateCloudTexCoord(CloudSetup cloudSetup, float3 WorldPosition, float
 //
 // Common shadow mapping setup, can be bound to "Sas.Shadow[?]" binding
 //
-struct ShadowSetup
-{
-	float4x4 WorldToShadow;
-	float4 Zero_Zero_OneOverMapSize_OneOverMapSize; // The component layout is optimized so that ps_2_0 swizzles can be used
-};
-
-// float4x4 ShadowMapWorldToShadow;
+// struct ShadowSetup
+// {
+	// float4x4 WorldToShadow;
+	// float4 Zero_Zero_OneOverMapSize_OneOverMapSize; // The component layout is optimized so that ps_2_0 swizzles can be used
+// };
 
 static const float shadowZBias = 0.0015; // Can use 0.001 with post processing pass
 
-float4 CalculateShadowMapTexCoord(ShadowSetup shadowSetup, float3 worldPosition)
+float4 CalculateShadowMapTexCoord(float4x4 WorldToShadow, float3 worldPosition)
 {
-	float4 shadowTexCoord = mul(float4(worldPosition, 1), shadowSetup.WorldToShadow);
+	float4 shadowTexCoord = mul(float4(worldPosition, 1), WorldToShadow);
 
 	shadowTexCoord.xyz /= shadowTexCoord.w;
 	shadowTexCoord.z -= shadowZBias;
@@ -266,9 +264,9 @@ float4 CalculateShadowMapTexCoord(ShadowSetup shadowSetup, float3 worldPosition)
 	return shadowTexCoord;
 }
 
-float4 CalculateShadowMapTexCoord_PerspectiveCorrect(ShadowSetup shadowSetup, float3 worldPosition)
+float4 CalculateShadowMapTexCoord_PerspectiveCorrect(float4x4 WorldToShadow, float3 worldPosition)
 {
-	float4 shadowTexCoord = mul(float4(worldPosition, 1), shadowSetup.WorldToShadow);
+	float4 shadowTexCoord = mul(float4(worldPosition, 1), WorldToShadow);
 	return shadowTexCoord;
 }
 
@@ -279,13 +277,13 @@ float4 CalculateShadowMapTexCoord_PerspectiveCorrect(ShadowSetup shadowSetup, fl
 #if defined( EA_PLATFORM_XENON ) 
 
 float g_fShadowSampleScale = 2.0;
-float shadow(sampler2D shadowSampler, float4 shadowTexCoord, ShadowSetup shadowSetup)
+float shadow(sampler2D shadowSampler, float4 shadowTexCoord, float4 Zero_Zero_OneOverMapSize_OneOverMapSize)
 {
 	float2 t = shadowTexCoord.xy;
 
 #if defined( XENON_USE_PCF_16 )
 
-	float scale = shadowSetup.Zero_Zero_OneOverMapSize_OneOverMapSize.z / g_fShadowSampleScale;
+	float scale = Zero_Zero_OneOverMapSize_OneOverMapSize.z / g_fShadowSampleScale;
 	float sum = 0.0;
 
 	float4 samples;
@@ -326,9 +324,9 @@ float shadow(sampler2D shadowSampler, float4 shadowTexCoord, ShadowSetup shadowS
 #else
 	float4 samples = float4(
 		tex2D(shadowSampler, t).x,
-		tex2D(shadowSampler, t + shadowSetup.Zero_Zero_OneOverMapSize_OneOverMapSize.zx).x,
-		tex2D(shadowSampler, t + shadowSetup.Zero_Zero_OneOverMapSize_OneOverMapSize.yz).x,
-		tex2D(shadowSampler, t + shadowSetup.Zero_Zero_OneOverMapSize_OneOverMapSize.wz).x);
+		tex2D(shadowSampler, t + Zero_Zero_OneOverMapSize_OneOverMapSize.zx).x,
+		tex2D(shadowSampler, t + Zero_Zero_OneOverMapSize_OneOverMapSize.yz).x,
+		tex2D(shadowSampler, t + Zero_Zero_OneOverMapSize_OneOverMapSize.wz).x);
 		
 	bool4 bits = (samples - shadowTexCoord.z >= 0);
 
@@ -341,7 +339,7 @@ float shadow(sampler2D shadowSampler, float4 shadowTexCoord, ShadowSetup shadowS
 
 #else // #if defined( EA_PLATFORM_XENON )
 
-float shadow(sampler2D shadowSampler, float4 shadowTexCoord, ShadowSetup shadowSetup)
+float shadow(sampler2D shadowSampler, float4 shadowTexCoord, float4 Zero_Zero_OneOverMapSize_OneOverMapSize)
 {
 	float2 t = shadowTexCoord.xy;
 		
@@ -359,9 +357,9 @@ float shadow(sampler2D shadowSampler, float4 shadowTexCoord, ShadowSetup shadowS
 
 	float4 samples = float4(
 		tex2D(shadowSampler, t).x,
-		tex2D(shadowSampler, t + shadowSetup.Zero_Zero_OneOverMapSize_OneOverMapSize.zx).x,
-		tex2D(shadowSampler, t + shadowSetup.Zero_Zero_OneOverMapSize_OneOverMapSize.yz).x,
-		tex2D(shadowSampler, t + shadowSetup.Zero_Zero_OneOverMapSize_OneOverMapSize.wz).x);
+		tex2D(shadowSampler, t + Zero_Zero_OneOverMapSize_OneOverMapSize.zx).x,
+		tex2D(shadowSampler, t + Zero_Zero_OneOverMapSize_OneOverMapSize.yz).x,
+		tex2D(shadowSampler, t + Zero_Zero_OneOverMapSize_OneOverMapSize.wz).x);
 		
 	bool4 bits = (samples - depth >= 0);
 
@@ -373,15 +371,15 @@ float shadow(sampler2D shadowSampler, float4 shadowTexCoord, ShadowSetup shadowS
 
 #endif // #if defined( EA_PLATFORM_XENON )
 
-float shadow_PerspectiveCorrect(sampler2D shadowSampler, float4 shadowTexCoord, ShadowSetup shadowSetup)
+float shadow_PerspectiveCorrect(sampler2D shadowSampler, float4 shadowTexCoord, float4 Zero_Zero_OneOverMapSize_OneOverMapSize)
 {
 	shadowTexCoord.xyz /= shadowTexCoord.w;
 	shadowTexCoord.z -= shadowZBias;
 
-    return shadow(shadowSampler, shadowTexCoord, shadowSetup);
+    return shadow(shadowSampler, shadowTexCoord, Zero_Zero_OneOverMapSize_OneOverMapSize);
 }
 
-float shadowSimple(sampler2D shadowSampler, float4 shadowTexCoord, ShadowSetup shadowSetup)
+float shadowSimple(sampler2D shadowSampler, float4 shadowTexCoord, float4 Zero_Zero_OneOverMapSize_OneOverMapSize)
 {
 	float2 t = shadowTexCoord.xy;
 	float depth = shadowTexCoord.z;
@@ -401,7 +399,6 @@ float shadowSimple(sampler2D shadowSampler, float4 shadowTexCoord, ShadowSetup s
 	
 #define SAMPLER_2D_SHADOW( shadowMapName ) \
 	SAMPLER_2D_BEGIN( shadowMapName, \
-		string Texture = "ShadowMap"; \
 		string UIWidget = "None"; \
 		string SasBindAddress = "Sas.Shadow[0].ShadowMap"; \
 		) \
