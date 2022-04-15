@@ -659,19 +659,22 @@ float4 PS_H(VSOutput_H In, uniform int HasShadow, uniform bool recolorEnabled) :
 
 #if defined(SUPPORT_POINT_LIGHTS)
 	// Compute point lights
-	float3 temp;
+	float3 pointlight;
 	for (int i = 0; i < NumPointLights; i++)
 	{
-		float3 direction = PointLight[i].Position - In.ReflectVector;
+		float3 LightColor = PointLight[i].Color;
+		float3 LightPosition = PointLight[i].Position;
+		float2 LightRange = PointLight[i].Range_Inner_Outer;
+		
+		float3 direction = LightPosition - In.ReflectVector;
 		float lightDistance = length(direction);
 		direction /= lightDistance;
 		
-		float attenuation = CalculatePointLightAttenuation(PointLight[i], lightDistance);
+		float attenuation = CalculatePointLightAttenuation(LightRange, lightDistance);
 		
-		// diffuseLight += PointLight[i].Color * attenuation * max(0, dot(worldNormal, direction));
-		temp.xyz += PointLight[i].Color * attenuation * direction;
+		pointlight.xyz += LightColor * attenuation * max(dot(bumpNormal, direction), 0);
 	}
-	color.xyz += temp * diffuse;
+	color.xyz += pointlight * diffuse;
 #endif
 
 	color.w = baseTexture.w * In.Color.w;

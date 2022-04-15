@@ -429,44 +429,13 @@ float shadowSimple(sampler2D shadowSampler, float4 shadowTexCoord, float4 Zero_Z
 	{ float3(0, 0, 0), float3(0, 0, 0), 0 }
 
 
-float CalculatePointLightAttenuation(SasPointLight light, float lightDistance)
+float CalculatePointLightAttenuation(float2 lightrange, float lightDistance)
 {
-#if 0
-	// This is the "old" way lighting attenuation is computed for fixed-function WW3D rendering
-	
-	float a = 1.0; // "Inner radius"
-	float b = light.Range; // "Outer radius"
-
-	float3 attenuationFactors;
-	attenuationFactors.x = 1.0;
-	if (abs(a - b) < 1e-5)
-	{
-		// if the attenuation range is too small assume uniform with cutoff
-		attenuationFactors.y = 0.0;
-	}
-	else
-	{
-		// this will cause the light to drop to half intensity at the first far attenuation
-		attenuationFactors.y = 0.1 / a;
-	}
-
-	attenuationFactors.z = 8.0 / (b * b);
-	
-	float attenuation = 1.0 / dot(attenuationFactors, float3(1, lightDistance, lightDistance * lightDistance));
-	
-	if (lightDistance > b)
-		attenuation = 0.0;
-
-	return attenuation;
-#else
-	// This is the new way.
-
 	// Make a squared fall-off
-	float attenuation = max(0, 1.0 - lightDistance / light.Range_Inner_Outer);
+	float attenuation = saturate(1.0 - (lightDistance - lightrange.x) / (lightrange.y - lightrange.x));
 	attenuation *= attenuation;
 
 	return attenuation;
-#endif
 }
 	
 
