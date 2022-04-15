@@ -823,21 +823,21 @@ VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 float4 PS_M(VSOutput_M In, uniform bool HasShadow, uniform bool recolorEnabled) : COLOR
 {
 	// Get diffuse color
-	float4 baseTexture = tex2D( SAMPLER(DiffuseTexture), In.TexCoord0);
+	half4 baseTexture = tex2D( SAMPLER(DiffuseTexture), In.TexCoord0);
 	
-	float4 color;
+	half4 color;
 	color.w = baseTexture.w * In.Color.w;
 
-	float3 specularColor = SpecularColor;
+	half3 specularColor = SpecularColor;
 
 #if defined(SUPPORT_SPECMAP)
-	float4 specTexture = tex2D(SAMPLER(SpecMap), In.TexCoord0);
-	float specularStrength = specTexture.x;  // Specular lighting mask
+	half4 specTexture = tex2D(SAMPLER(SpecMap), In.TexCoord0);
+	half specularStrength = specTexture.x;  // Specular lighting mask
 	
 #if defined(SUPPORT_RECOLORING)
 	if (recolorEnabled)
 	{
-		float HouseColorStrength = specTexture.z;
+		half HouseColorStrength = specTexture.z;
 		baseTexture.xyz += HouseColorStrength * (baseTexture.xyz * RecolorColor * 2 - baseTexture.xyz);
 	}
 #endif
@@ -846,23 +846,23 @@ float4 PS_M(VSOutput_M In, uniform bool HasShadow, uniform bool recolorEnabled) 
 
 	color.xyz = baseTexture.xyz * In.Color.xyz;
 
-	float3 diffuse = baseTexture.xyz * DiffuseColor;
+	half3 diffuse = baseTexture.xyz * DiffuseColor;
 
 	// Get bump map normal
-	float3 bumpNormal = (float3)tex2D(SAMPLER(NormalMap), In.TexCoord0) * 2.0 - 1.0;
+	half3 bumpNormal = (half3)tex2D(SAMPLER(NormalMap), In.TexCoord0) * 2.0 - 1.0;
 	// Scale normal to increase/decrease bump effect
 	bumpNormal.xy *= BumpScale;
 	bumpNormal = normalize(bumpNormal);
 
 	// Compute lighting
 
-	float3 lightVec = In.LightVector.xyz;
-	float3 halfVec  = In.HalfEyeLightVector.xyz;
+	half3 lightVec = In.LightVector.xyz;
+	half3 halfVec  = In.HalfEyeLightVector.xyz;
 
-	float4 diffuseTerm = dot( bumpNormal, lightVec );
-	float4 specularTerm = dot( bumpNormal, halfVec );
+	half4 diffuseTerm = dot( bumpNormal, lightVec );
+	half4 specularTerm = dot( bumpNormal, halfVec );
 
-	float4 lighting = lit( diffuseTerm, specularTerm, SpecularExponent );
+	half4 lighting = lit( diffuseTerm, specularTerm, SpecularExponent );
 
 	if (HasShadow)
 	{
@@ -870,7 +870,7 @@ float4 PS_M(VSOutput_M In, uniform bool HasShadow, uniform bool recolorEnabled) 
 	}
 	
 	// Sample cloud texture
-	float3 cloud = float3(1, 1, 1);			
+	half3 cloud = half3(1, 1, 1);			
 #if defined(_WW3D_) && !defined(_W3DVIEW_)
 	cloud = tex2D( SAMPLER(CloudTexture), In.ShroudTexCoord.zw);
 #endif
