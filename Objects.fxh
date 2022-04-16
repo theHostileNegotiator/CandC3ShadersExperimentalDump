@@ -352,28 +352,28 @@ SAMPLER_2D_END
 
 #endif // if defined(SUPPORT_RECOLORING) && !defined(SCROLL_HOUSECOLOR)
 
-#if defined(OBJECTS_ALIEN)
-// Fixed material parameters for Aliens
-static const float BumpScale = 1.5;
-static const float3 AmbientColor = float3(1.0, 1.0, 1.0);
-static const float4 DiffuseColor = float4(1.0, 1.0, 1.0, 1.0);
-static const float3 SpecularColor = float3(0.788, 0.761, 1.0);
-static const float SpecularExponent = 15.0;
-
-#elif defined(MATERIAL_PARAMS_GDI)
+#if defined(MATERIAL_PARAMS_ALLIED)
 // Fixed material parameters for Allies
 static const float BumpScale = 1.5;
 static const float3 AmbientColor = float3(0.1, 0.1, 0.1);
-static const float4 DiffuseColor = float4(1.0, 1.0, 1.0, 0);
+static const float4 DiffuseColor = float4(1.0, 1.0, 1.0, 1.0);
 static const float3 SpecularColor = float3(0.8, 0.8, 0.8);
 static const float SpecularExponent = 50.0;
 
-#elif defined(MATERIAL_PARAMS_NOD)
+#elif defined(MATERIAL_PARAMS_SOVIET)
 // Fixed material parameters for Soviets
 static const float BumpScale = 1.5;
-static const float3 AmbientColor = float3(0.3, 0.3, 0.3);
-static const float4 DiffuseColor = float4(0.584, 0.624, 0.733, 1.0);
-static const float3 SpecularColor = float3(1.0, 1.0, 1.0);
+static const float3 AmbientColor = float3(0.1, 0.1, 0.1);
+static const float4 DiffuseColor = float4(1.0, 1.0, 1.0, 1.0);
+static const float3 SpecularColor = float3(0.8, 0.8, 0.8);
+static const float SpecularExponent = 45.0;
+
+#elif defined(MATERIAL_PARAMS_JAPAN)
+// Fixed material parameters for Japan
+static const float BumpScale = 1.5;
+static const float3 AmbientColor = float3(0.1, 0.1, 0.1);
+static const float4 DiffuseColor = float4(1.0, 1.0, 1.0, 1.0);
+static const float3 SpecularColor = float3(0.8, 0.8, 0.8);
 static const float SpecularExponent = 50.0;
 
 #else
@@ -464,15 +464,14 @@ float Time : Time;
 // ----------------------------------------------------------------------------
 struct VSOutput_H {
 
-	float4 Position : POSITION; //Correct
-	float4 TexCoord0_TexCoord1 : TEXCOORD0; //Correct
+	float4 Position : POSITION;
+	float4 TexCoord0_TexCoord1 : TEXCOORD0;
 	float3 LightVector[NumDirectionalLightsPerPixel] : TEXCOORD1_centroid;
-	// float3 TexCoord2 : TEXCOORD2;
 	float3 HalfEyeLightVector : TEXCOORD3_centroid;
-	float3 ReflectVector : TEXCOORD4; //Correct
-	float4 ShadowMapTexCoord : TEXCOORD5; //Correct
-	float4 ShroudTexCoord : TEXCOORD6; //Correct
-	float4 Color : COLOR0; //Correct
+	float3 ReflectVector : TEXCOORD4;
+	float4 ShadowMapTexCoord : TEXCOORD5;
+	float4 ShroudTexCoord : TEXCOORD6;
+	float4 Color : COLOR0;
 
 #ifdef PER_PIXEL_POINT_LIGHT
 	float3 WorldPosition : TEXCOORD7;
@@ -512,6 +511,7 @@ VSOutput_H VS_H(VSInputSkinningOneBoneTangentFrame InSkin,
 	Out.Color = float4(AmbientLightColor * AmbientColor + diffuseLight * DiffuseColor, OpacityOverride);
 	Out.Color.xyz /= 2;
 	Out.Color *= VertexColor;
+
 	// Build 3x3 tranform from object to tangent space
 	float3x3 worldToTangentSpace = transpose(float3x3(-worldBinormal, -worldTangent, worldNormal));
 
