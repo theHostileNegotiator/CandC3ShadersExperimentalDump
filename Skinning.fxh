@@ -132,7 +132,7 @@ float3 Quaternion_RotateVector(float4 rotation, float3 position)
 
 
 #if !defined(EA_PLATFORM_XENON)
-BoneTransform WorldBones[MaxSkinningBones*2]
+BoneTransform WorldBones[MaxSkinningBones*2] : register(c128)
 <
 	bool unmanaged = 1;
 >;

@@ -62,12 +62,12 @@ string DefaultParameterScopeBlock = "material";
 static const int NumDirectionalLights = 3;
 static const int NumDirectionalLightsPerPixel = 2;
 // static const int NumPointLights = 8;
-float3 AmbientLightColor
+float3 AmbientLightColor : register(c4)
 <
 	bool unmanaged = 1;
 > = float3(0.3, 0.3, 0.3);
 
-SasDirectionalLight DirectionalLight[NumDirectionalLights]
+SasDirectionalLight DirectionalLight[NumDirectionalLights] : register(c5)
 <
 	bool unmanaged = 1;
 > =
@@ -86,7 +86,7 @@ int NumPointLights
 	string UIWidget = "None";
 >;
 
-SasPointLight PointLight[8]
+SasPointLight PointLight[8] : register(c89)
 <
 	bool unmanaged = 1;
 >;
@@ -95,7 +95,7 @@ SasPointLight PointLight[8]
 // ----------------------------------------------------------------------------
 // Cloud layer
 // ----------------------------------------------------------------------------
-CloudSetup Cloud
+CloudSetup Cloud : register(c117)
 <
 	bool unmanaged = 1;
 >;
@@ -135,7 +135,7 @@ bool HasRecolorColors
 	bool ExportValue = 0;
 >;
 
-float3 RecolorColor
+float3 RecolorColor : register(c0)
 <
 	bool unmanaged = 1;
 >;
@@ -153,22 +153,22 @@ float3 RecolorColorDummy
 
 #endif // defined(SUPPORT_RECOLORING)
 
-float4x4 ShadowMapWorldToShadow
+float4x4 ShadowMapWorldToShadow : register(c113)
 <
 	bool unmanaged = 1;
 >;
 
-float OpacityOverride
+float OpacityOverride : register(c1)
 <
 	bool unmanaged = 1;
 > = 1.0;
 
-float3 TintColor
+float3 TintColor : register(c2)
 <
 	bool unmanaged = 1;
 > = float3(1, 1, 1);
 
-float3 EyePosition
+float3 EyePosition : register(c123)
 <
 	bool unmanaged = 1;
 >;
@@ -178,7 +178,7 @@ float3 EyePosition
 // ----------------------------------------------------------------------------
 
 #if defined(_WW3D_)
-float4x4 ViewProjection
+float4x4 ViewProjection : register(c119)
 <
 	bool unmanaged = 1;
 >;
@@ -217,7 +217,7 @@ bool HasShadow
 
 SAMPLER_2D_SHADOW( ShadowMap )
 
-float4 Shadowmap_Zero_Zero_OneOverMapSize_OneOverMapSize
+float4 Shadowmap_Zero_Zero_OneOverMapSize_OneOverMapSize : register(c11)
 <
 	string UIWidget = "None";
 	string SasBindAddress = "Sas.Shadow[0].Zero_Zero_OneOverMapSize_OneOverMapSize";
@@ -265,7 +265,7 @@ int NumJointsPerVertex
 
 #if defined(USE_NON_SKINNING_WORLD_MATRIX)
 
-float4x3 World : World;
+float4x3 World : World : register(c124);
 
 #endif
 
@@ -436,7 +436,7 @@ bool AlphaTestEnable
 // ----------------------------------------------------------------------------
 // Shroud
 // ----------------------------------------------------------------------------
-ShroudSetup Shroud
+ShroudSetup Shroud : register(c11)
 <
 	string UIWidget = "None";
 	string SasBindAddress = "Terrain.Shroud";
