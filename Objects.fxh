@@ -557,7 +557,7 @@ VSOutput_H VS_Xenon(VSInputSkinningOneBoneTangentFrame InSkin,
 // ----------------------------------------------------------------------------
 // SHADER: PS_H
 // ----------------------------------------------------------------------------
-float4 PS_H(VSOutput_H In, uniform int HasShadow, uniform bool recolorEnabled) : COLOR
+float4 PS_H(VSOutput_H In, uniform bool HasShadow, uniform bool recolorEnabled) : COLOR
 {
 	float2 texCoord0 = In.TexCoord0_TexCoord1.xy;
 	float2 texCoord1 = In.TexCoord0_TexCoord1.wz;
@@ -565,7 +565,7 @@ float4 PS_H(VSOutput_H In, uniform int HasShadow, uniform bool recolorEnabled) :
 	float3 Vn = normalize(EyePosition.xyz - In.ReflectVector);
 
 	// Get diffuse color
-	float4 baseTexture = tex2D( SAMPLER(DiffuseTexture), texCoord0);	
+	float4 baseTexture = tex2D( SAMPLER(DiffuseTexture), texCoord0);
 
 #if defined(SUPPORT_SPECMAP)
 	float4 specTexture;
@@ -632,7 +632,7 @@ float4 PS_H(VSOutput_H In, uniform int HasShadow, uniform bool recolorEnabled) :
 
 	float2 cloudTexCoord = In.ShroudTexCoord.zw;
 	
-	color.xyz += Shadow * DirectionalLight[0].Color * envcolor * specularStrength;
+	color.xyz += DirectionalLight[0].Color * envcolor * specularStrength * Shadow;
 	
 	for (int i = 0; i < NumDirectionalLightsPerPixel; i++)
 	{
@@ -641,19 +641,18 @@ float4 PS_H(VSOutput_H In, uniform int HasShadow, uniform bool recolorEnabled) :
 		float3 cloud = float3(1, 1, 1);			
 #if defined(_WW3D_) && !defined(_W3DVIEW_)
 		cloud = tex2D( SAMPLER(CloudTexture), cloudTexCoord);
-		cloud.xyz = exp2(log2(cloud.xyz) * 2.2);
+		cloud.xyz = exp2(log2(cloud.xyz) * 2.2) * Shadow;
 #endif
 
-		float directionlight = max(dot(bumpNormal, DirectionalLight[i].Direction), 0);
+		float3 directionlight = max(dot(bumpNormal, DirectionalLight[i].Direction), 0);
 		
 		if (i == 0)
 		{
-			color.xyz += Shadow * cloud * DirectionalLight[0].Color * diffuse * directionlight;
+			color.xyz += DirectionalLight[0].Color * cloud * (diffuse * directionlight);
 		}
 		else 
 		{
-			
-	    	color.xyz += DirectionalLight[i].Color * diffuse * directionlight;
+	    	color.xyz += DirectionalLight[i].Color * (diffuse * directionlight);
 		}
 	}
 
@@ -827,7 +826,7 @@ VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 	Out.ShroudTexCoord.xy = CalculateShroudTexCoord(Shroud, worldPosition);
 	Out.ShroudTexCoord.zw = CalculateCloudTexCoord(Cloud, worldPosition, Time);
 	Out.ShadowMapTexCoord = CalculateShadowMapTexCoord(ShadowMapWorldToShadow, worldPosition);
-	Out.MapCellTexCoord = float2(1, -1) * (worldPosition.xy / (MapCellSize.x * 66));
+	Out.MapCellTexCoord = worldPosition.xy * float2(1, -1)  / (MapCellSize.x * 66);
 	
 	return Out;
 }
