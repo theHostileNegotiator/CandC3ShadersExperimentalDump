@@ -1,0 +1,11 @@
+//////////////////////////////////////////////////////////////////////////////
+// ©2006 Electronic Arts Inc
+//
+// FX Shader for generic vehicles and structures. Infantry should use Infantry.fx
+//////////////////////////////////////////////////////////////////////////////
+
+#define SUPPORT_POINT_LIGHTS 1
+#define SUPPORT_SPECMAP 1
+#define SUPPORT_LIGHTMAP 1
+
+#include "Objects.fxh"

@@ -348,6 +348,19 @@ SAMPLER_2D_BEGIN( SpecMap,
 SAMPLER_2D_END
 #endif
 
+#if defined(SUPPORT_LIGHTMAP)
+SAMPLER_2D_BEGIN( LightMap,
+	string UIName = "Light Map";
+	)
+	MinFilter = MinFilterBest;
+	MagFilter = MagFilterBest;
+	MipFilter = MipFilterBest;
+	MaxAnisotropy = 8;
+    AddressU = Clamp;
+    AddressV = Clamp;
+SAMPLER_2D_END
+#endif
+
 #if defined(SUPPORT_RECOLORING)
 
 #endif // if defined(SUPPORT_RECOLORING) && !defined(SCROLL_HOUSECOLOR)
@@ -483,6 +496,9 @@ struct VSOutput_H {
 // ----------------------------------------------------------------------------
 VSOutput_H VS_H(VSInputSkinningOneBoneTangentFrame InSkin, 
 		float2 TexCoord : TEXCOORD0,
+#if defined(SUPPORT_LIGHTMAP)
+		float2 TexCoord1 : TEXCOORD1,
+#endif
 		float4 VertexColor : COLOR0,
 		uniform int numJointsPerVertex)
 {
@@ -521,7 +537,11 @@ VSOutput_H VS_H(VSInputSkinningOneBoneTangentFrame InSkin,
 	Out.ShroudTexCoord.xy = CalculateShroudTexCoord(Shroud, worldPosition);
 	Out.ShroudTexCoord.zw = CalculateCloudTexCoord(Cloud, worldPosition, Time);
 	// pass texture coordinates for fetching the diffuse and normal maps
+#if defined(SUPPORT_LIGHTMAP)
+	Out.TexCoord0_TexCoord1.xyzw = float4(TexCoord.xy, TexCoord1.yx);
+#else
 	Out.TexCoord0_TexCoord1.xyzw = TexCoord.xyyx;
+#endif
 	
 	for (int i = 0; i < NumDirectionalLightsPerPixel; i++)
 	{
@@ -545,11 +565,17 @@ VSOutput_H VS_H(VSInputSkinningOneBoneTangentFrame InSkin,
 // ----------------------------------------------------------------------------
 VSOutput_H VS_Xenon(VSInputSkinningOneBoneTangentFrame InSkin, 
 		float2 TexCoord : TEXCOORD0,
+#if defined(SUPPORT_LIGHTMAP)
+		float2 TexCoord1 : TEXCOORD1,
+#endif
 		float4 VertexColor : COLOR
 		)
 {
 	return VS_H( InSkin,
 		TexCoord,
+#if defined(SUPPORT_LIGHTMAP)
+		TexCoord1,
+#endif
 		VertexColor,
 		min(NumJointsPerVertex, 1) );
 }
@@ -673,6 +699,12 @@ float4 PS_H(VSOutput_H In, uniform bool HasShadow, uniform bool recolorEnabled) 
 		
 		pointlight.xyz += LightColor * attenuation * max(dot(bumpNormal, direction), 0);
 	}
+#if defined(SUPPORT_LIGHTMAP)
+	// Get lightmap
+	float4 lightTexture = tex2D( SAMPLER(LightMap), texCoord1);
+	lightTexture.xyz = exp2(log2(lightTexture.xyz) * 2.2);
+	pointlight += lightTexture.xyz * 10;
+#endif
 	color.xyz += pointlight * diffuse;
 #endif
 
@@ -782,6 +814,9 @@ struct VSOutput_M
 
 VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 		float2 TexCoord : TEXCOORD0,
+#if defined(SUPPORT_LIGHTMAP)
+		float2 TexCoord1 : TEXCOORD1,
+#endif
 		float4 VertexColor : COLOR,
 		uniform int numJointsPerVertex)
 {
@@ -822,7 +857,11 @@ VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex, World).w;
 	Out.Color.w = OpacityOverride;
 	Out.Color *= VertexColor;
-	Out.TexCoord0 = TexCoord.xyyx;
+#if defined(SUPPORT_LIGHTMAP)
+	Out.TexCoord0.xyzw = float4(TexCoord.xy, TexCoord1.yx);
+#else
+	Out.TexCoord0.xyzw = TexCoord.xyyx;
+#endif
 	Out.ShroudTexCoord.xy = CalculateShroudTexCoord(Shroud, worldPosition);
 	Out.ShroudTexCoord.zw = CalculateCloudTexCoord(Cloud, worldPosition, Time);
 	Out.ShadowMapTexCoord = CalculateShadowMapTexCoord(ShadowMapWorldToShadow, worldPosition);
@@ -837,7 +876,7 @@ VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 float4 PS_M(VSOutput_M In, uniform bool HasShadow, uniform bool recolorEnabled) : COLOR
 {
 	// Get diffuse color
-	half4 baseTexture = tex2D( SAMPLER(DiffuseTexture), In.TexCoord0);
+	half4 baseTexture = tex2D( SAMPLER(DiffuseTexture), In.TexCoord0.xy);
 	
 	half4 color;
 	color.w = baseTexture.w * In.Color.w;
@@ -845,7 +884,7 @@ float4 PS_M(VSOutput_M In, uniform bool HasShadow, uniform bool recolorEnabled) 
 	half3 specularColor = SpecularColor;
 
 #if defined(SUPPORT_SPECMAP)
-	half4 specTexture = tex2D(SAMPLER(SpecMap), In.TexCoord0);
+	half4 specTexture = tex2D(SAMPLER(SpecMap), In.TexCoord0.xy);
 	half specularStrength = specTexture.x;  // Specular lighting mask
 	
 #if defined(SUPPORT_RECOLORING)
@@ -863,7 +902,7 @@ float4 PS_M(VSOutput_M In, uniform bool HasShadow, uniform bool recolorEnabled) 
 	half3 diffuse = baseTexture.xyz * DiffuseColor;
 
 	// Get bump map normal
-	half3 bumpNormal = (half3)tex2D(SAMPLER(NormalMap), In.TexCoord0) * 2.0 - 1.0;
+	half3 bumpNormal = (half3)tex2D(SAMPLER(NormalMap), In.TexCoord0.xy) * 2.0 - 1.0;
 	// Scale normal to increase/decrease bump effect
 	bumpNormal.xy *= BumpScale;
 	bumpNormal = normalize(bumpNormal);
@@ -890,6 +929,11 @@ float4 PS_M(VSOutput_M In, uniform bool HasShadow, uniform bool recolorEnabled) 
 #endif
 
 	color.xyz += DirectionalLight[0].Color * cloud * (diffuse * lighting.y + specularColor * lighting.z);
+
+#if defined(SUPPORT_LIGHTMAP)
+	half4 lightTexture = tex2D(SAMPLER(LightMap), In.TexCoord0.wz);
+	color.xyz += lightTexture * 10 * diffuse;
+#endif
 
 	color.xyz *= TintColor;
 
