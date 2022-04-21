@@ -526,7 +526,11 @@ VSOutput_H VS_H(VSInputSkinningOneBoneTangentFrame InSkin,
 
 	Out.Color = float4(AmbientLightColor * AmbientColor + diffuseLight * DiffuseColor, OpacityOverride);
 	Out.Color.xyz /= 2;
+#if defined(SUPPORT_TREADS)
+	Out.Color *= float4(VertexColor.xyz, 1);
+#else
 	Out.Color *= VertexColor;
+#endif
 
 	// Build 3x3 tranform from object to tangent space
 	float3x3 worldToTangentSpace = transpose(float3x3(-worldBinormal, -worldTangent, worldNormal));
@@ -539,6 +543,9 @@ VSOutput_H VS_H(VSInputSkinningOneBoneTangentFrame InSkin,
 	// pass texture coordinates for fetching the diffuse and normal maps
 #if defined(SUPPORT_LIGHTMAP)
 	Out.TexCoord0_TexCoord1.xyzw = float4(TexCoord.xy, TexCoord1.yx);
+#elif defined(SUPPORT_TREADS)
+	Out.TexCoord0_TexCoord1.xw = VertexColor.w + TexCoord.x;
+	Out.TexCoord0_TexCoord1.yz = TexCoord.y;
 #else
 	Out.TexCoord0_TexCoord1.xyzw = TexCoord.xyyx;
 #endif
@@ -856,12 +863,22 @@ VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 	Out.Color.xyz = AmbientLightColor * AmbientColor + diffuseLight * DiffuseColor;
 	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex, World).w;
 	Out.Color.w = OpacityOverride;
+
+#if defined(SUPPORT_TREADS)
+	Out.Color *= float4(VertexColor.xyz, 1);
+#else
 	Out.Color *= VertexColor;
+#endif
+
 #if defined(SUPPORT_LIGHTMAP)
 	Out.TexCoord0.xyzw = float4(TexCoord.xy, TexCoord1.yx);
+#elif defined(SUPPORT_TREADS)
+	Out.TexCoord0.xw = VertexColor.w + TexCoord.x;
+	Out.TexCoord0.yz = TexCoord.y;
 #else
 	Out.TexCoord0.xyzw = TexCoord.xyyx;
 #endif
+
 	Out.ShroudTexCoord.xy = CalculateShroudTexCoord(Shroud, worldPosition);
 	Out.ShroudTexCoord.zw = CalculateCloudTexCoord(Cloud, worldPosition, Time);
 	Out.ShadowMapTexCoord = CalculateShadowMapTexCoord(ShadowMapWorldToShadow, worldPosition);
@@ -1053,8 +1070,19 @@ VSOutput_L VS_L(VSInputSkinningOneBoneTangentFrame InSkin, float2 TexCoord : TEX
 	Out.Color_Opacity.xyz = AmbientLightColor * AmbientColor + diffuseLight * DiffuseColor;
 	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex, World).w;
 	Out.Color_Opacity.w = OpacityOverride;
+#if defined(SUPPORT_TREADS)
+	Out.Color_Opacity *= float4(VertexColor.xyz, 1);
+#else
 	Out.Color_Opacity *= VertexColor;
+#endif
+
+#if defined(SUPPORT_TREADS)
+	Out.BaseTexCoord.xw = VertexColor.w + TexCoord.x;
+	Out.BaseTexCoord.yz = TexCoord.y;
+#else
 	Out.BaseTexCoord = TexCoord.xyyx;
+#endif
+
 	Out.ShroudTexCoord = CalculateShroudTexCoord(Shroud, worldPosition);
 
 	return Out;
@@ -1181,11 +1209,24 @@ VSOutput_CreateShadowMap CreateShadowMapVS(VSInputSkinningOneBoneTangentFrame In
 
 	// Transform position to projection space
 	Out.Position = mul(float4(worldPosition, 1), GetViewProjection());	
-	Out.Depth = Out.Position.z / Out.Position.w;	
+	Out.Depth = Out.Position.z / Out.Position.w;
+
 	Out.TexCoord0 = TexCoord;	
 
 	VertexColor.w *= GetFirstBonePosition(InSkin.BlendIndices, numJointsPerVertex, World).w;
+
+#if defined(SUPPORT_TREADS)
+	Out.Color = OpacityOverride;
+#else
 	Out.Color = VertexColor.w * OpacityOverride;
+#endif
+
+#if defined(SUPPORT_TREADS)
+	Out.TexCoord0.x = VertexColor.w + TexCoord.x;
+	Out.TexCoord0.y = TexCoord.y;
+#else
+	Out.TexCoord0 = TexCoord;
+#endif
 
 	return Out;
 }
