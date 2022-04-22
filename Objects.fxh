@@ -348,6 +348,19 @@ SAMPLER_2D_BEGIN( SpecMap,
 SAMPLER_2D_END
 #endif
 
+#if defined(SUPPORT_BUILDINGS)
+SAMPLER_2D_BEGIN( DamagedTexture,
+	string UIName = "Damaged Texture";
+	)
+	MinFilter = MinFilterBest;
+	MagFilter = MagFilterBest;
+	MipFilter = MipFilterBest;
+	MaxAnisotropy = 8;
+    AddressU = Wrap;
+    AddressV = Wrap;
+SAMPLER_2D_END
+#endif
+
 #if defined(SUPPORT_LIGHTMAP)
 SAMPLER_2D_BEGIN( LightMap,
 	string UIName = "Light Map";
@@ -441,10 +454,16 @@ float EnvMult
 > = 1.0;
 #endif
 
+#if defined(SUPPORT_BUILDINGS)
+
+bool AlphaTestEnable = 1.0;
+#else
+
 bool AlphaTestEnable
 <
 	string UIName = "Alpha Test Enable";
 > = false;
+#endif
 
 // ----------------------------------------------------------------------------
 // Shroud
@@ -496,7 +515,7 @@ struct VSOutput_H {
 // ----------------------------------------------------------------------------
 VSOutput_H VS_H(VSInputSkinningOneBoneTangentFrame InSkin, 
 		float2 TexCoord : TEXCOORD0,
-#if defined(SUPPORT_LIGHTMAP)
+#if defined(SUPPORT_BUILDINGS) || defined(SUPPORT_LIGHTMAP)
 		float2 TexCoord1 : TEXCOORD1,
 #endif
 		float4 VertexColor : COLOR0,
@@ -541,7 +560,7 @@ VSOutput_H VS_H(VSInputSkinningOneBoneTangentFrame InSkin,
 	Out.ShroudTexCoord.xy = CalculateShroudTexCoord(Shroud, worldPosition);
 	Out.ShroudTexCoord.zw = CalculateCloudTexCoord(Cloud, worldPosition, Time);
 	// pass texture coordinates for fetching the diffuse and normal maps
-#if defined(SUPPORT_LIGHTMAP)
+#if defined(SUPPORT_BUILDINGS) || defined(SUPPORT_LIGHTMAP)
 	Out.TexCoord0_TexCoord1.xyzw = float4(TexCoord.xy, TexCoord1.yx);
 #elif defined(SUPPORT_TREADS)
 	Out.TexCoord0_TexCoord1.xw = VertexColor.w + TexCoord.x;
@@ -572,7 +591,7 @@ VSOutput_H VS_H(VSInputSkinningOneBoneTangentFrame InSkin,
 // ----------------------------------------------------------------------------
 VSOutput_H VS_Xenon(VSInputSkinningOneBoneTangentFrame InSkin, 
 		float2 TexCoord : TEXCOORD0,
-#if defined(SUPPORT_LIGHTMAP)
+#if defined(SUPPORT_BUILDINGS) || defined(SUPPORT_LIGHTMAP)
 		float2 TexCoord1 : TEXCOORD1,
 #endif
 		float4 VertexColor : COLOR
@@ -580,7 +599,7 @@ VSOutput_H VS_Xenon(VSInputSkinningOneBoneTangentFrame InSkin,
 {
 	return VS_H( InSkin,
 		TexCoord,
-#if defined(SUPPORT_LIGHTMAP)
+#if defined(SUPPORT_BUILDINGS) || defined(SUPPORT_LIGHTMAP)
 		TexCoord1,
 #endif
 		VertexColor,
@@ -715,7 +734,14 @@ float4 PS_H(VSOutput_H In, uniform bool HasShadow, uniform bool recolorEnabled) 
 	color.xyz += pointlight * diffuse;
 #endif
 
+#if defined(SUPPORT_BUILDINGS)
+	float4 damagedtexture = tex2D( SAMPLER(DamagedTexture), texCoord1);
+	damagedtexture = lerp(damagedtexture, 1.0, In.Color.w);
+	color.w = baseTexture.w;
+	color *= damagedtexture;
+#else
 	color.w = baseTexture.w * In.Color.w;
+#endif
 
 	color.xyz *= TintColor;
 
@@ -776,9 +802,11 @@ pixelshader PS_H_Array[PS_H_Multiplier_Final] =
 technique Default
 {
 	pass p0
+#if !defined(SUPPORT_BUILDINGS)
 	<
 		USE_EXPRESSION_EVALUATOR("Objects")
 	>
+#endif
 	{
 		VertexShader = VS_H_Array[min(NumJointsPerVertex, 1)];
 			
@@ -789,16 +817,26 @@ technique Default
 		ZWriteEnable = true;
 		CullMode = CW;
 
+#if defined(SUPPORT_BUILDINGS)
+		AlphaBlendEnable = false;
+
+		AlphaFunc = GreaterEqual;
+		AlphaRef = DEFAULT_ALPHATEST_THRESHOLD;
+
+		AlphaTestEnable = true;
+#else
+	
 #if !EXPRESSION_EVALUATOR_ENABLED		
 		AlphaBlendEnable = ( OpacityOverride < 0.99);
 		AlphaTestEnable = ( AlphaTestEnable );
 #endif
-
 		SrcBlend = SrcAlpha;
 		DestBlend = InvSrcAlpha;
-
+		
 		AlphaFunc = GreaterEqual;
 		AlphaRef = DEFAULT_ALPHATEST_THRESHOLD;
+#endif
+
 
 	}
 }
@@ -821,7 +859,7 @@ struct VSOutput_M
 
 VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 		float2 TexCoord : TEXCOORD0,
-#if defined(SUPPORT_LIGHTMAP)
+#if defined(SUPPORT_BUILDINGS) || defined(SUPPORT_LIGHTMAP)
 		float2 TexCoord1 : TEXCOORD1,
 #endif
 		float4 VertexColor : COLOR,
@@ -870,7 +908,7 @@ VSOutput_M VS_M(VSInputSkinningOneBoneTangentFrame InSkin,
 	Out.Color *= VertexColor;
 #endif
 
-#if defined(SUPPORT_LIGHTMAP)
+#if defined(SUPPORT_BUILDINGS) || defined(SUPPORT_LIGHTMAP)
 	Out.TexCoord0.xyzw = float4(TexCoord.xy, TexCoord1.yx);
 #elif defined(SUPPORT_TREADS)
 	Out.TexCoord0.xw = VertexColor.w + TexCoord.x;
@@ -896,7 +934,6 @@ float4 PS_M(VSOutput_M In, uniform bool HasShadow, uniform bool recolorEnabled) 
 	half4 baseTexture = tex2D( SAMPLER(DiffuseTexture), In.TexCoord0.xy);
 	
 	half4 color;
-	color.w = baseTexture.w * In.Color.w;
 
 	half3 specularColor = SpecularColor;
 
@@ -952,6 +989,15 @@ float4 PS_M(VSOutput_M In, uniform bool HasShadow, uniform bool recolorEnabled) 
 	color.xyz += lightTexture * 10 * diffuse;
 #endif
 
+#if defined(SUPPORT_BUILDINGS)
+	half4 damagedTexture = tex2D(SAMPLER(DamagedTexture), In.TexCoord0.wz);
+	float4 damagedTextureP = lerp(damagedTexture, 1.0, In.Color.w);
+	color.w = baseTexture.w;
+	color *= damagedTextureP;
+#else
+	color.w = baseTexture.w * In.Color.w;
+#endif
+
 	color.xyz *= TintColor;
 
 	color.xyz *= tex2D( SAMPLER(ShroudTexture), In.ShroudTexCoord.xy);
@@ -1003,9 +1049,11 @@ pixelshader PS_M_Array[PS_M_Multiplier_Final] =
 technique Default_M
 {
 	pass p0
+#if !defined(SUPPORT_BUILDINGS)
 	<
 		USE_EXPRESSION_EVALUATOR("Objects")
 	>
+#endif
 	{
 		VertexShader = VS_M_Array[min(NumJointsPerVertex, 1)];
 			
@@ -1016,15 +1064,24 @@ technique Default_M
 		ZWriteEnable = true;
 		CullMode = CW;
 		
-		SrcBlend = SrcAlpha;
-		DestBlend = InvSrcAlpha;
-				
+#if defined(SUPPORT_BUILDINGS)
+		AlphaBlendEnable = false;
+
 		AlphaFunc = GreaterEqual;
 		AlphaRef = DEFAULT_ALPHATEST_THRESHOLD;
 
+		AlphaTestEnable = true;
+#else
+		SrcBlend = SrcAlpha;
+		DestBlend = InvSrcAlpha;
+		
+		AlphaFunc = GreaterEqual;
+		AlphaRef = DEFAULT_ALPHATEST_THRESHOLD;
+		
 #if !EXPRESSION_EVALUATOR_ENABLED				
 		AlphaBlendEnable = ( OpacityOverride < 0.99);
 		AlphaTestEnable = ( AlphaTestEnable );
+#endif
 #endif
 
 	}
@@ -1041,7 +1098,12 @@ struct VSOutput_L
 	float2 ShroudTexCoord : TEXCOORD1;
 };
 
-VSOutput_L VS_L(VSInputSkinningOneBoneTangentFrame InSkin, float2 TexCoord : TEXCOORD0, float4 VertexColor : COLOR0,
+VSOutput_L VS_L(VSInputSkinningOneBoneTangentFrame InSkin,
+	float2 TexCoord : TEXCOORD0,
+#if defined(SUPPORT_BUILDINGS)
+	float2 TexCoord1 : TEXCOORD1,
+#endif
+	float4 VertexColor : COLOR0,
 	uniform int numJointsPerVertex)
 {
 	USE_DIRECTIONAL_LIGHT_INTERACTIVE(DirectionalLight, 0);
@@ -1076,7 +1138,9 @@ VSOutput_L VS_L(VSInputSkinningOneBoneTangentFrame InSkin, float2 TexCoord : TEX
 	Out.Color_Opacity *= VertexColor;
 #endif
 
-#if defined(SUPPORT_TREADS)
+#if defined(SUPPORT_BUILDINGS)
+	Out.BaseTexCoord.xyzw = float4(TexCoord.xy, TexCoord1.yx);
+#elif defined(SUPPORT_TREADS)
 	Out.BaseTexCoord.xw = VertexColor.w + TexCoord.x;
 	Out.BaseTexCoord.yz = TexCoord.y;
 #else
@@ -1093,24 +1157,38 @@ VSOutput_L VS_L(VSInputSkinningOneBoneTangentFrame InSkin, float2 TexCoord : TEX
 // ----------------------------------------------------------------------------
 float4 PS_L(VSOutput_L In, uniform bool recolorEnabled) : COLOR
 {
+#if defined(SUPPORT_BUILDINGS)
+	float4 damagedTexture = tex2D(SAMPLER(DamagedTexture), In.BaseTexCoord.wz);
+	damagedTexture = lerp(damagedTexture, 1.0, In.Color_Opacity.w);
+#endif
 
 	// Get diffuse color
-	float4 baseTexture = tex2D(SAMPLER(DiffuseTexture), In.BaseTexCoord);
+	float4 baseTexture = tex2D(SAMPLER(DiffuseTexture), In.BaseTexCoord.xy);
 
 #if defined(SUPPORT_SPECMAP) && defined(SUPPORT_RECOLORING)
 	if (recolorEnabled)
 	{
-		float4 specTexture = tex2D(SAMPLER(SpecMap), In.BaseTexCoord);
+		float4 specTexture = tex2D(SAMPLER(SpecMap), In.BaseTexCoord.xy);
 		float HouseColorStrength = specTexture.z;
 		baseTexture.xyz += HouseColorStrength * (baseTexture.xyz * RecolorColor * 2 - baseTexture.xyz);
 	}
 #endif
 
-	float3 color = baseTexture.xyz * In.Color_Opacity.xyz * TintColor;
+	float4 color;
+	color.xyz = baseTexture.xyz * In.Color_Opacity.xyz;
+
+#if defined(SUPPORT_BUILDINGS)
+	color.w = baseTexture.w;
+	color *= damagedTexture;
+#else
+	color.w = baseTexture.w * In.Color_Opacity.w;
+#endif
+
+	color.xyz *= TintColor;
 
 	color.xyz *= tex2D(SAMPLER(ShroudTexture), In.ShroudTexCoord);
 
-	return float4(color, baseTexture.w * In.Color_Opacity.w);
+	return color;
 }
 
 // ----------------------------------------------------------------------------
@@ -1151,9 +1229,11 @@ pixelshader PS_L_Array[PS_L_Multiplier_Final] =
 technique Default_L
 {
 	pass p0
+#if !defined(SUPPORT_BUILDINGS)
 	<
 		USE_EXPRESSION_EVALUATOR("Objects")
 	>
+#endif
 	{
 		VertexShader = VS_L_Array[min(NumJointsPerVertex, 1)];
 			
@@ -1164,15 +1244,24 @@ technique Default_L
 		ZWriteEnable = true;
 		CullMode = CW;
 		
+#if defined(SUPPORT_BUILDINGS)
+		AlphaBlendEnable = false;
+
+		AlphaFunc = GreaterEqual;
+		AlphaRef = DEFAULT_ALPHATEST_THRESHOLD;
+
+		AlphaTestEnable = true;
+#else
 		SrcBlend = SrcAlpha;
 		DestBlend = InvSrcAlpha;
 		
 		AlphaFunc = GreaterEqual;
 		AlphaRef = DEFAULT_ALPHATEST_THRESHOLD;
-
+		
 #if !EXPRESSION_EVALUATOR_ENABLED	
 		AlphaBlendEnable = ( OpacityOverride < 0.99);
 		AlphaTestEnable = ( AlphaTestEnable );
+#endif
 #endif
 
 	}
@@ -1188,12 +1277,18 @@ struct VSOutput_CreateShadowMap
 	float4 Position : POSITION;
 	float2 TexCoord0 : TEXCOORD0;
 	float Depth : TEXCOORD1;
+#if defined(SUPPORT_BUILDINGS)
+	float2 TexCoord2 : TEXCOORD2;
+#endif
 	float Color : COLOR;
 };
 
 // ----------------------------------------------------------------------------
 VSOutput_CreateShadowMap CreateShadowMapVS(VSInputSkinningOneBoneTangentFrame InSkin,
 	float2 TexCoord : TEXCOORD0,
+#if defined(SUPPORT_BUILDINGS)
+	float2 TexCoord1 : TEXCOORD1,
+#endif
 	float4 VertexColor : COLOR,
 	uniform int numJointsPerVertex)
 {
@@ -1228,14 +1323,24 @@ VSOutput_CreateShadowMap CreateShadowMapVS(VSInputSkinningOneBoneTangentFrame In
 	Out.TexCoord0 = TexCoord;
 #endif
 
+#if defined(SUPPORT_BUILDINGS)
+	Out.TexCoord2 = TexCoord1;
+#endif
+
 	return Out;
 }
 
 // ----------------------------------------------------------------------------
 float4 CreateShadowMapPS(VSOutput_CreateShadowMap In, uniform bool alphaTestEnable): COLOR
 {
-
-	float opacity = tex2D(SAMPLER(DiffuseTexture), In.TexCoord0).w * In.Color;	
+	
+	float4 baseTexture = tex2D(SAMPLER(DiffuseTexture), In.TexCoord0);
+#if defined(SUPPORT_BUILDINGS)
+	float4 damagedtexture = tex2D(SAMPLER(DamagedTexture), In.TexCoord2);
+	float opacity = baseTexture.w * lerp(damagedtexture.w, 1.0, In.Color);
+#else
+	float opacity = baseTexture.w * In.Color;
+#endif
 	if (alphaTestEnable)
 	{
 		// Simulate alpha testing for floating point render target
@@ -1249,11 +1354,17 @@ float4 CreateShadowMapPS(VSOutput_CreateShadowMap In, uniform bool alphaTestEnab
 // ----------------------------------------------------------------------------
 VSOutput_CreateShadowMap CreateShadowMapVS_Xenon(VSInputSkinningOneBoneTangentFrame InSkin,
 		float2 TexCoord : TEXCOORD0,
+#if defined(SUPPORT_BUILDINGS)
+		float2 TexCoord1 : TEXCOORD1,
+#endif
 		float VertexColor: COLOR
 		)
 {
 	return CreateShadowMapVS( InSkin,
 		TexCoord,
+#if defined(SUPPORT_BUILDINGS)
+		TexCoord1,
+#endif
 		VertexColor,
 		min(NumJointsPerVertex, 1) );
 }
