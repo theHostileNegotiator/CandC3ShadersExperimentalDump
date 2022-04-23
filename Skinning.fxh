@@ -18,145 +18,29 @@
 #ifndef _SKINNING_FXH_
 #define _SKINNING_FXH_
 
-static const int MaxSkinningBones = 64;
-// static const int MaxSkinningBones_L = 32;
-
 //
-// Defines
+// Global uploaded constants
 //
 
-// Define the bone representation to use:
-#define BONES_AS_QUATERNION_TRANSLATION	// Lowest per-bone data, but cannot represent scaling
-//#define BONES_AS_FLOAT4X3				// Medium per-bone data, but still incompatible with DXSAS
-//#define BONES_AS_MATRIX				// Highest per-bone data, but compatible with DXSAS
-
-#if defined(BONES_AS_QUATERNION_TRANSLATION)
-	// Define this to allow non-skinned objects to use full world matrices.
-	// Useful if quaternion-translation mode is used for skinning,
-	// as otherwise no object can have scaling
-	#define USE_NON_SKINNING_WORLD_MATRIX
-#endif
-
-
-
-//
-// Helper functions/structures
-//
-
-float3 Quaternion_RotateVector(float4 rotation, float3 position)
-{
-/*	float x = rotation.w * position.x + rotation.y * position.z - rotation.z * position.y;
-	float y = rotation.w * position.y + rotation.z * position.x - rotation.x * position.z;
-	float z = rotation.w * position.z + rotation.x * position.y - rotation.y * position.x;
-	float w = -(rotation.x * position.x + rotation.y * position.y) - rotation.z * position.z;
-
-	float3 outPosition;
-	outPosition.x = rotation.w * x - w * rotation.x + rotation.y * z - y * rotation.z;
-	outPosition.y = rotation.w * y - w * rotation.y + rotation.z * x - z * rotation.x;
-	outPosition.z = rotation.w * z - w * rotation.z + rotation.x * y - x * rotation.y;
-
-	return outPosition;
-*/
-	
-	float4 a;
-	a = rotation.wwwx * position.xyzx + rotation.yzxy * position.zxyy;
-	a.w = -a.w;
-	a -= rotation.zxyz * position.yzxz;
-
-	return rotation.www * a.xyz - rotation.xyz * a.www + rotation.yzx * a.zxy - rotation.zxy * a.yzx;
-}
-
-
-//
-// Definition of the BoneTransform struct with accessor functions
-//
-#if defined(BONES_AS_QUATERNION_TRANSLATION)
-
-	#define BoneTransform float4
-
-//	struct BoneTransform;
-//	{
-//		float4 Rotation;
-//		float4 Translation_Zero;
-//	};
-	
-	float3 BoneTransformPosition(BoneTransform r, BoneTransform t, float3 position)
-	{	
-		return Quaternion_RotateVector(r, position) + t.xyz;
-//		return Quaternion_RotateVector(b.Rotation, position) + b.Translation_Zero.xyz;
-	}
-	
-	float3 BoneTransformDirection(BoneTransform r, float3 direction)
-	{
-		return Quaternion_RotateVector(r, direction);
-//		return Quaternion_RotateVector(b.Rotation, direction);
-	}
-
-#else
-
-	#if defined(BONES_AS_MATRIX)
-	
-		#define BoneTransform float4x3
-		
-		float4x3 GetBoneMatrix(BoneTransform b)
-		{
-			return b;
-		}
-	
-	#else // defined(BONES_AS_FLOAT4X3)
-	
-		struct BoneTransform
-		{
-			float4 Rows[3];
-		};
-		
-		float4x3 GetBoneMatrix(BoneTransform b)
-		{
-			return transpose(float3x4(b));
-		}
-	
-	#endif
-	
-	float3 BoneTransformPosition(BoneTransform b, float3 position)
-	{
-		return mul(float4(position, 1), GetBoneMatrix(b));
-	}
-	
-	float3 BoneTransformDirection(BoneTransform b, float3 direction)
-	{
-		return mul(direction, GetBoneMatrix(b));
-	}
-
-#endif
-
-
-
-#if !defined(EA_PLATFORM_XENON)
-BoneTransform WorldBones[MaxSkinningBones*2] : register(c128)
-<
-	bool unmanaged = 1;
->;
-
-// BoneTransform WorldBones_L[MaxSkinningBones_L*2]
-// <
-	// bool unmanaged = 1;
-// >;
-
-#else
-
-shared BoneTransform WorldBones[MaxSkinningBones*2] : register(c0)
+int _SasGlobal : SasGlobal 
 <
 	string UIWidget = "None";
-	string SasBindAddress = "Sas.Skeleton.MeshToJointToWorld[*]";
+	int3 SasVersion = int3(1, 0, 0);
+	int MaxLocalLights = 8;
+	int MaxSupportedInstancingMode = 1;
 >;
 
-shared BoneTransform WorldBones_L[MaxSkinningBones_L*2] : register(c0)
+int NumJointsPerVertex
 <
 	string UIWidget = "None";
-	string SasBindAddress = "Sas.Skeleton.MeshToJointToWorld[*]";
->;
-#endif
+	string SasBindAddress = "Sas.Skeleton.NumJointsPerVertex";
+> = 0;
 
+#if defined(USE_NON_SKINNING_WORLD_MATRIX)
+
+float4x3 World : World : register(c124);
+
+#endif
 
 //
 // Functions/structs for calculating the skinning with multiple bones, but without tangent frame

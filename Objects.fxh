@@ -54,150 +54,30 @@
 #define SAMPLER_CUBE_END };
 #endif
 
-string DefaultParameterScopeBlock = "material";
+// ----------------------------------------------------------------------------
+// Global Parameters used in all shaders
+// ----------------------------------------------------------------------------
+#include "GlobalParameters.fxh"
 
 // ----------------------------------------------------------------------------
-// Light sources
+// Gamma Correction
 // ----------------------------------------------------------------------------
-static const int NumDirectionalLights = 3;
-static const int NumDirectionalLightsPerPixel = 2;
-// static const int NumPointLights = 8;
-float3 AmbientLightColor : register(c4)
-<
-	bool unmanaged = 1;
-> = float3(0.3, 0.3, 0.3);
-
-SasDirectionalLight DirectionalLight[NumDirectionalLights] : register(c5)
-<
-	bool unmanaged = 1;
-> =
-{
-	DEFAULT_DIRECTIONAL_LIGHT_1,
-	DEFAULT_DIRECTIONAL_LIGHT_2,
-	DEFAULT_DIRECTIONAL_LIGHT_3
-};
-
-DECLARE_DIRECTIONAL_LIGHT_INTERACTIVE(DirectionalLight, 0);
-
-#if defined(SUPPORT_POINT_LIGHTS)
-int NumPointLights
-<
-	string SasBindAddress = "Sas.NumPointLights";
-	string UIWidget = "None";
->;
-
-SasPointLight PointLight[8] : register(c89)
-<
-	bool unmanaged = 1;
->;
-#endif
+#include "Gamma.fxh"
 
 // ----------------------------------------------------------------------------
-// Cloud layer
+// Screen Space Ambient Occlusion
 // ----------------------------------------------------------------------------
-CloudSetup Cloud : register(c117)
-<
-	bool unmanaged = 1;
->;
-
-float3 NoCloudMultiplier
-<
-	bool unmanaged = 1;
-> = float3(1, 1, 1);
+#include "SSAO.fxh"
 
 // ----------------------------------------------------------------------------
-// House coloring
+// Shadow mapping
 // ----------------------------------------------------------------------------
-
-#if defined(SUPPORT_RECOLORING)
-
-#if defined(_3DSMAX_)
-
-bool NumRecolorColors
-<
-	string UIName = "Preview House Color Enable";
-	bool ExportValue = false;
-> = false;
-
-float3 RecolorColor
-<
-	string UIName = "Preview House Color";
-	string UIWidget = "Color";
-	bool ExportValue = false;
-> = float3(.7, .05, .05);
-
-#else
-
-bool HasRecolorColors
-<
-	string UIWidget = "None";
-	string SasBindAddress = "WW3D.HasRecolorColors";
-	bool ExportValue = 0;
->;
-
-float3 RecolorColor : register(c0)
-<
-	bool unmanaged = 1;
->;
-#endif
-
-#else // defined(SUPPORT_RECOLORING)
-
-static const bool HasRecolorColors = false;
-static const float3 RecolorColor = float3(0, 0, 0);
-
-float3 RecolorColorDummy
-<
-	bool unmanaged = 1;
->;
-
-#endif // defined(SUPPORT_RECOLORING)
-
-float4x4 ShadowMapWorldToShadow : register(c113)
-<
-	bool unmanaged = 1;
->;
-
-float OpacityOverride : register(c1)
-<
-	bool unmanaged = 1;
-> = 1.0;
-
-float3 TintColor : register(c2)
-<
-	bool unmanaged = 1;
-> = float3(1, 1, 1);
-
-float3 EyePosition : register(c123)
-<
-	bool unmanaged = 1;
->;
+#include "ShadowMap.fxh"
 
 // ----------------------------------------------------------------------------
-// Transformations (world transformations are in skinning header)
+// Macro Texture
 // ----------------------------------------------------------------------------
-
-#if defined(_WW3D_)
-float4x4 ViewProjection : register(c119)
-<
-	bool unmanaged = 1;
->;
-
-float4x4 GetViewProjection()
-{
-	return ViewProjection;
-}
-#else
-float4x4 View : View;
-float4x3 ViewI : ViewInverse;
-
-float4x4 Projection : Projection;
-
-float4x4 GetViewProjection()
-{
-	return mul(View, Projection);
-}
-#endif
+#include "MacroTexture.fxh"
 
 // ----------------------------------------------------------------------------
 // Skinning
@@ -207,68 +87,8 @@ static const int MaxSkinningBonesPerVertex = 1;
 #include "Skinning.fxh"
 
 // ----------------------------------------------------------------------------
-// Shadow mapping
+// Cloud Map
 // ----------------------------------------------------------------------------
-bool HasShadow
-<
-	string UIWidget = "None";
-	string SasBindAddress = "Sas.HasShadow";
->;
-
-SAMPLER_2D_SHADOW( ShadowMap )
-
-float4 Shadowmap_Zero_Zero_OneOverMapSize_OneOverMapSize : register(c11)
-<
-	string UIWidget = "None";
-	string SasBindAddress = "Sas.Shadow[0].Zero_Zero_OneOverMapSize_OneOverMapSize";
->;
-
-// ----------------
-
-float2 MapCellSize
-<
-	string UIWidget = "None";
-	string SasBindAddress = "Terrain.Map.CellSize";
-> = float2(10, 10);
-
-SAMPLER_2D_BEGIN( MacroSampler,
-	string UIWidget = "None";
-	string SasBindAddress = "Terrain.MacroTexture";
-	string ResourceName = "ShaderPreviewMacro.dds";
-	)
-	MinFilter = Linear;
-	MagFilter = Linear;
-	MipFilter = Linear;
-    AddressU = Wrap;
-    AddressV = Wrap;
-SAMPLER_2D_END
-
-int _SasGlobal : SasGlobal 
-<
-	string UIWidget = "None";
-	int3 SasVersion = int3(1, 0, 0);
-	int MaxLocalLights = 8;
-	int MaxSupportedInstancingMode = 1;
->;
-
-// MAPS
-
-//
-// Global uploaded constants
-//
-
-int NumJointsPerVertex
-<
-	string UIWidget = "None";
-	string SasBindAddress = "Sas.Skeleton.NumJointsPerVertex";
-> = 0;
-
-#if defined(USE_NON_SKINNING_WORLD_MATRIX)
-
-float4x3 World : World : register(c124);
-
-#endif
-
 SAMPLER_2D_BEGIN( CloudTexture,
 	string UIWidget = "None";
 	string SasBindAddress = "Terrain.Cloud.Texture";
@@ -373,10 +193,6 @@ SAMPLER_2D_BEGIN( LightMap,
     AddressV = Clamp;
 SAMPLER_2D_END
 #endif
-
-#if defined(SUPPORT_RECOLORING)
-
-#endif // if defined(SUPPORT_RECOLORING) && !defined(SCROLL_HOUSECOLOR)
 
 #if defined(MATERIAL_PARAMS_ALLIED)
 // Fixed material parameters for Allies
@@ -488,7 +304,6 @@ SAMPLER_2D_END
 // ----------------------------------------------------------------------------
 // Utility functions
 // ----------------------------------------------------------------------------
-
 float Time : Time;
 
 // ----------------------------------------------------------------------------
@@ -634,7 +449,7 @@ float4 PS_H(VSOutput_H In, uniform bool HasShadow, uniform bool recolorEnabled) 
 #endif //defined(SUPPORT_RECOLORING)
 #endif // SUPPORT_SPECMAP
 	
-	baseTexture.xyz = exp2(log2(baseTexture.xyz) * 2.2);
+	baseTexture.xyz = GammatoLinear(baseTexture.xyz);
 	
 	float3 diffuse = baseTexture.xyz * DiffuseColor;
 
@@ -693,7 +508,7 @@ float4 PS_H(VSOutput_H In, uniform bool HasShadow, uniform bool recolorEnabled) 
 		float3 cloud = float3(1, 1, 1);			
 #if defined(_WW3D_) && !defined(_W3DVIEW_)
 		cloud = tex2D( SAMPLER(CloudTexture), cloudTexCoord);
-		cloud.xyz = exp2(log2(cloud.xyz) * 2.2) * Shadow;
+		cloud.xyz = GammatoLinear(cloud.xyz) * Shadow;
 #endif
 
 		float3 directionlight = max(dot(bumpNormal, DirectionalLight[i].Direction), 0);
@@ -728,7 +543,7 @@ float4 PS_H(VSOutput_H In, uniform bool HasShadow, uniform bool recolorEnabled) 
 #if defined(SUPPORT_LIGHTMAP)
 	// Get lightmap
 	float4 lightTexture = tex2D( SAMPLER(LightMap), texCoord1);
-	lightTexture.xyz = exp2(log2(lightTexture.xyz) * 2.2);
+	lightTexture.xyz = GammatoLinear(lightTexture.xyz);
 	pointlight += lightTexture.xyz * 10;
 #endif
 	color.xyz += pointlight * diffuse;
@@ -736,7 +551,7 @@ float4 PS_H(VSOutput_H In, uniform bool HasShadow, uniform bool recolorEnabled) 
 
 #if defined(SUPPORT_BUILDINGS)
 	float4 damagedtexture = tex2D( SAMPLER(DamagedTexture), texCoord1);
-	damagedtexture = lerp(damagedtexture, 1.0, In.Color.w);
+	damagedtexture = lerp(damagedtexture, 1, In.Color.w);
 	color.w = baseTexture.w;
 	color *= damagedtexture;
 #else
@@ -991,7 +806,7 @@ float4 PS_M(VSOutput_M In, uniform bool HasShadow, uniform bool recolorEnabled) 
 
 #if defined(SUPPORT_BUILDINGS)
 	half4 damagedTexture = tex2D(SAMPLER(DamagedTexture), In.TexCoord0.wz);
-	float4 damagedTextureP = lerp(damagedTexture, 1.0, In.Color.w);
+	float4 damagedTextureP = lerp(damagedTexture, 1, In.Color.w);
 	color.w = baseTexture.w;
 	color *= damagedTextureP;
 #else
@@ -1159,7 +974,7 @@ float4 PS_L(VSOutput_L In, uniform bool recolorEnabled) : COLOR
 {
 #if defined(SUPPORT_BUILDINGS)
 	float4 damagedTexture = tex2D(SAMPLER(DamagedTexture), In.BaseTexCoord.wz);
-	damagedTexture = lerp(damagedTexture, 1.0, In.Color_Opacity.w);
+	damagedTexture = lerp(damagedTexture, 1, In.Color_Opacity.w);
 #endif
 
 	// Get diffuse color
@@ -1337,7 +1152,7 @@ float4 CreateShadowMapPS(VSOutput_CreateShadowMap In, uniform bool alphaTestEnab
 	float4 baseTexture = tex2D(SAMPLER(DiffuseTexture), In.TexCoord0);
 #if defined(SUPPORT_BUILDINGS)
 	float4 damagedtexture = tex2D(SAMPLER(DamagedTexture), In.TexCoord2);
-	float opacity = baseTexture.w * lerp(damagedtexture.w, 1.0, In.Color);
+	float opacity = baseTexture.w * lerp(damagedtexture.w, 1, In.Color);
 #else
 	float opacity = baseTexture.w * In.Color;
 #endif
